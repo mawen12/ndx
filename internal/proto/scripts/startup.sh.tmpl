@@ -1,0 +1,84 @@
+echo 'N:start run startup sh'
+
+cd
+
+rm -rf {{ .PrefixPath }}
+if [ $? -ne 0 ]; then
+  echo 'E:1:startup rm {{ .PrefixPath }} failed';
+  exit 1;
+else
+  echo 'N:startup rm {{ .PrefixPath }} success';  
+fi
+
+mkdir -p {{ .PrefixPath }}
+if [ $? -ne 0 ]; then
+  echo 'E:1:startup create {{ .PrefixPath }} failed';
+  exit 1;
+else
+  echo 'N:startup create {{ .PrefixPath }} success';  
+fi
+
+cd {{ .PrefixPath }}
+if [ $? -ne 0 ]; then
+  echo 'E:1:startup cd {{ .PrefixPath }} failed';
+  exit 1;
+else
+  echo 'N:startup cd {{ .PrefixPath }} success';   
+fi
+
+  cat <<- 'EOF' > {{ .AgentPath }}
+{{ .AgentContent }}
+EOF
+
+if [ $? -ne 0 ]; then
+  echo 'E:1:startup agent failed';
+  exit 1;
+else
+  echo 'N:startup agent success';
+fi
+
+  cat <<- 'EOF' > {{ .LibPath }}
+{{ .LibContent }}
+EOF
+
+if [ $? -ne 0 ]; then
+  echo 'E:1:startup agent lib failed';
+  exit 1;
+else
+  echo 'N:startup agent lib success';  
+fi
+
+  cat <<- 'EOF' > {{ .IndexPath }}
+{{ .IndexContent }}
+EOF
+
+if [ $? -ne 0 ]; then
+  echo 'E:1:startup agent index failed';
+  exit 1;
+else
+  echo 'N:startup agent index success';
+fi
+
+  cat <<- 'EOF' > {{ .SearchPath }}
+{{ .SearchContent }}
+EOF
+
+if [ $? -ne 0 ]; then
+  echo 'E:1:startup agent search failed';
+  exit 1;
+else
+  echo 'N:startup agent search success';  
+fi
+
+bash {{ .AgentPath }} logstream_info --logfile {{ .LogFile }} 
+# bash {{ .AgentPath }} logstream_info --logfile '/Users/mawen/logs/app.log' 
+# bash {{ .AgentPath }} query --logfile '/home/mawen/logs/app.log' --index-file 'index.log' --max-num-lines 10
+
+if [ $? -ne 0 ]; then
+  echo 'E:1:startup run agent failed';
+  exit 1;
+else 
+  echo 'N:startup ok'
+fi
+
+echo 'Z:{{ .ID }}'
