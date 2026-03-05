@@ -11,7 +11,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal"
-	"github.com/mawen12/ndx/internal/conn"
+	"github.com/mawen12/ndx/internal/pool"
 	"github.com/mawen12/ndx/internal/ui"
 )
 
@@ -19,7 +19,7 @@ type App struct {
 	*ui.App
 	Content *PageStack
 
-	conn *conn.NdxConn
+	pool *pool.Pool
 }
 
 func NewApp() *App {
@@ -31,7 +31,7 @@ func NewApp() *App {
 	return &a
 }
 
-func (a *App) Init() error {
+func (a *App) Init(conns string) error {
 	ctx := context.WithValue(context.Background(), internal.KeyApp, a)
 
 	if err := a.Content.Init(ctx); err != nil {
@@ -46,29 +46,16 @@ func (a *App) Init() error {
 
 	a.initSignals()
 
-	connString := "cmd://mawen@localhost/home/mawen/logs/app.log"
-	config, err := conn.ParseConfig(connString)
+	p, err := pool.Connect(conns)
 	if err != nil {
 		return err
 	}
-	config.OnNotice = func(conn *conn.NdxConn, notice *conn.Notice) {
-		slog.Info("Receive conn notice", "message", notice.Message)
-	}
-	conn, err := conn.ConnectConfig(ctx, config)
-	if err != nil {
-		return err
-	}
+
+	p.AddListener(a)
 
 	slog.Info("Connection establish success", "conn", "cmd://mawen@localhost/home/mawen/logs/app.log")
 
-	a.conn = conn
-
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "green", "-", "🖳", 1))
-	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "orange", "-", "🖳", 0))
-	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "red", "-", "🖳", 0))
-
-	a.StatusLine().ShowLeft(sb.String())
+	a.pool = p
 
 	return nil
 }
@@ -81,6 +68,7 @@ func (a *App) Run() error {
 	}()
 
 	a.SetRunning(true)
+	slog.Info("App is running")
 
 	if err := a.Application.Run(); err != nil {
 		return err
@@ -109,6 +97,21 @@ func (a *App) initSignals() {
 
 	go func(sig chan os.Signal) {
 		<-sig
+		slog.Info("Receive SIGHUP, exiting...")
 		os.Exit(0)
 	}(sig)
+}
+
+func (a *App) OnStat(stat pool.Stat) {
+
+	slog.Info("receive stat update", "stat", stat)
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "green", "-", "🖳", stat.Idle))
+	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "orange", "-", "🖳", stat.Busy))
+	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "red", "-", "🖳", stat.Closed))
+
+	a.QueueUpdateDraw(func() {
+		a.StatusLine().ShowLeft(sb.String())
+	})
 }

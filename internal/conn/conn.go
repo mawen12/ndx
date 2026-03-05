@@ -299,6 +299,10 @@ func (ndConn *NdxConn) IsBusy() bool {
 	return ndConn.status == connStatusBusy
 }
 
+func (ndConn *NdxConn) IsIdle() bool {
+	return ndConn.status == connStatusIdle
+}
+
 func (ndConn *NdxConn) lock() error {
 	switch ndConn.status {
 	case connStatusBusy:

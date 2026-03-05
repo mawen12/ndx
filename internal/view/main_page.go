@@ -2,7 +2,6 @@ package view
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -48,9 +47,9 @@ func (mp *MainPage) Enter(old, new string) {
 
 func (mp *MainPage) Done(pattern string) {
 	// 查询数据
-	result := mp.app.conn.Exec(context.Background(), pattern, time.Now()).Read()
-	if result.Err != nil {
-		slog.Error("Query Failed", "pattern", pattern, "error", result.Err)
+	result, err := mp.app.pool.Exec(context.Background(), pattern, time.Now())
+	if err != nil {
+		slog.Error("Query Failed", "pattern", pattern, "error", err)
 		return
 	}
 	slog.Info("Query Success", "pattern", pattern, "records", len(result.Lines), "stat", result.Stat)
@@ -80,9 +79,9 @@ func (mp *MainPage) Done(pattern string) {
 	mp.app.Table().ScrollToEnd()
 
 	// show status line
-	slog.Info("query cost", "cost", result.Cost.Milliseconds())
+	//slog.Info("query cost", "cost", result.Cost.Milliseconds())
 
 	//mp.app.StatusLine().ShowRight(fmt.Sprintf("%d / %d", mp.app.conn.))
-	mp.app.Cmd().SetText(fmt.Sprintf("Query took: %dms", result.Cost.Milliseconds()))
+	//mp.app.Cmd().SetText(fmt.Sprintf("Query took: %dms", result.Cost.Milliseconds()))
 
 }

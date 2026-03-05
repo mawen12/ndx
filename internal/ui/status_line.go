@@ -24,18 +24,14 @@ func NewStatusLine(app *App) *StatusLine {
 		AddItem(nil, 1, 0, false).
 		AddItem(sl.right, 30, 0, false)
 
-	//sl.SetBackgroundColor(tcell.ColorGreen)
-
 	sl.left.
 		SetScrollable(false).
 		SetDynamicColors(true)
-	//SetBackgroundColor(tcell.ColorGreen)
 
 	sl.right.
 		SetScrollable(false).
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignRight)
-	//SetBackgroundColor(tcell.ColorGreen)
 
 	return &sl
 }

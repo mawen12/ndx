@@ -57,6 +57,24 @@ func (a *App) SetRunning(r bool) {
 	a.running = r
 }
 
+func (a *App) QueueUpdate(f func()) {
+	if a.Application == nil {
+		return
+	}
+	go func() {
+		a.Application.QueueUpdate(f)
+	}()
+}
+
+func (a *App) QueueUpdateDraw(f func()) {
+	if a.Application == nil {
+		return
+	}
+	go func() {
+		a.Application.QueueUpdateDraw(f)
+	}()
+}
+
 func (a *App) bindKeys() {
 	slog.Error("bindKeys not implemented")
 	a.actions = NewKeyActionsFromMap(KeyMap{
