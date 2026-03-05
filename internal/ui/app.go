@@ -25,10 +25,13 @@ func NewApp() *App {
 	}
 
 	a.views = map[string]tview.Primitive{
-		"queryLabel": NewQueryLabel(),
-		"query":      NewQuery(),
-		"time":       NewTime(),
-		"edit":       NewEdit(),
+		"queryLabel": NewQueryLabel(&a),
+		"query":      NewQuery(&a),
+		"time":       NewTime(&a),
+		"edit":       NewEdit(&a),
+		"table":      NewTable(&a),
+		"statusLine": NewStatusLine(&a),
+		"cmd":        NewCommand(&a),
 	}
 
 	return &a
@@ -76,6 +79,18 @@ func (a *App) Edit() *Edit {
 
 func (a *App) Time() *Time {
 	return a.views["time"].(*Time)
+}
+
+func (a *App) Table() *Table {
+	return a.views["table"].(*Table)
+}
+
+func (a *App) StatusLine() *StatusLine {
+	return a.views["statusLine"].(*StatusLine)
+}
+
+func (a *App) Cmd() *Command {
+	return a.views["cmd"].(*Command)
 }
 
 func AsKey(event *tcell.EventKey) tcell.Key {

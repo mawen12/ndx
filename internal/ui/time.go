@@ -4,15 +4,22 @@ import "github.com/rivo/tview"
 
 type Time struct {
 	*tview.TextView
+
+	app *App
 }
 
-func NewTime() *Time {
+func NewTime(app *App) *Time {
 	t := Time{
-		TextView: tview.NewTextView(),
+		TextView: tview.NewTextView().
+			SetText("-1h").
+			SetScrollable(false).
+			SetTextAlign(tview.AlignCenter),
+		app: app,
 	}
 
-	t.SetText("-1h")
-	t.SetScrollable(false)
-
 	return &t
+}
+
+func (t *Time) Name() string {
+	return "time"
 }

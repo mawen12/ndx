@@ -1,14 +1,10 @@
 run_search() {
   awk_pattern=''
   if [[ "$user_pattern" != "" ]]; then
-    awk_pattern='
-      !('$user_pattern') {
-        # print "N:filtered out line " NR ": " $0
-        numFilteredOut++;
-        next;
-      }
-    '
+    awk_pattern="!($user_pattern) {numFilteredOut++; next}"
   fi
+
+  echo "N:awk_pattern is $awk_pattern"
 
   awk_search_script='
     '$awk_funcs'
@@ -21,7 +17,6 @@ run_search() {
       numFilteredOut=0;
       num_bytes_to_scan='$num_bytes_to_scan';
       currentLog="";
-
       print "N:max line is " maxLines
     }
 

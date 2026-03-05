@@ -1,8 +1,14 @@
 package cmd
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
+	"path"
+	"runtime/debug"
+	"time"
 
+	"github.com/lmittmann/tint"
 	"github.com/mawen12/ndx/internal/config"
 	"github.com/mawen12/ndx/internal/view"
 	"github.com/spf13/cobra"
@@ -32,6 +38,31 @@ func Execute() {
 }
 
 func run(*cobra.Command, []string) error {
+	log := path.Join(os.TempDir(), "ndx.log")
+	logfile, err := os.OpenFile(log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("log file %q init failed: %w", log, err)
+	}
+
+	defer func() {
+		if logfile != nil {
+			_ = logfile.Close()
+		}
+	}()
+	defer func() {
+		if err := recover(); err != nil {
+			slog.Error("Boom! ndx init failed", "error", err)
+			slog.Error("", "stack", string(debug.Stack()))
+			fmt.Printf("%s", "Boom!\n")
+			fmt.Printf("%v.\n", err)
+		}
+	}()
+
+	slog.SetDefault(slog.New(tint.NewHandler(logfile, &tint.Options{
+		Level:      slog.LevelDebug,
+		TimeFormat: time.RFC3339,
+	})))
+
 	app := view.NewApp()
 
 	if err := app.Init(); err != nil {

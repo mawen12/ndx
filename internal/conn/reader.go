@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/mawen12/ndx/internal/model"
 	"github.com/mawen12/ndx/internal/proto"
 )
 
@@ -46,9 +47,11 @@ type Result struct {
 	Lines []LineInfo
 	Stat  map[int64]int
 	Err   error
+	Cost  time.Duration
 }
 
 func (rr *ResultReader) Read() *Result {
+	start := time.Now()
 	br := &Result{}
 
 	rr.stat = make(map[int64]int)
@@ -62,6 +65,7 @@ func (rr *ResultReader) Read() *Result {
 	br.Stat = rr.stat
 
 	br.Err = rr.err
+	br.Cost = time.Since(start)
 
 	return br
 }
@@ -102,4 +106,16 @@ func (rr *ResultReader) NextLine() error {
 	}
 
 	return nil
+}
+
+type stringReader struct {
+	conn model.Conn
+}
+
+func NewStringReader(conn model.Conn) *stringReader {
+	return &stringReader{conn: conn}
+}
+
+func (s *stringReader) Next() (string, error) {
+	return s.conn.Readout()
 }

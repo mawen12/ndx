@@ -3,6 +3,7 @@ package proto
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 )
 
@@ -27,7 +28,7 @@ func (src *Query) Encode(dst []byte) ([]byte, error) {
 		"From":        src.From,
 		"ToExists":    src.To != "",
 		"To":          src.To,
-		"Pattern":     src.Pattern,
+		"Pattern":     shellQuote(src.Pattern),
 		"ID":          src.ID,
 	})
 	if err != nil {
@@ -41,4 +42,8 @@ func (src *Query) Encode(dst []byte) ([]byte, error) {
 
 	dst = append(dst, bs...)
 	return dst, nil
+}
+
+func shellQuote(s string) string {
+	return fmt.Sprintf("'%s'", strings.Replace(s, "'", "'\"'\"'", -1))
 }

@@ -162,7 +162,7 @@ func isIPOnly(host string) bool {
 
 func makeDefaultBuildFrontendFunc() BuildFrontendFunc {
 	return func(conn model.Conn, w io.Writer) Frontend {
-		sr := proto.NewStringReader(conn)
+		sr := NewStringReader(conn)
 		frontend := proto.NewFrontend(sr, w)
 
 		return frontend

@@ -2,19 +2,24 @@ package view
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal"
+	"github.com/mawen12/ndx/internal/conn"
 	"github.com/mawen12/ndx/internal/ui"
-	"github.com/rivo/tview"
 )
 
 type App struct {
 	*ui.App
 	Content *PageStack
+
+	conn *conn.NdxConn
 }
 
 func NewApp() *App {
@@ -37,21 +42,43 @@ func (a *App) Init() error {
 
 	a.SetInputCapture(a.keyboard)
 
-	//a.bindKeys()
-
 	a.layout(ctx)
 
 	a.initSignals()
+
+	connString := "cmd://mawen@localhost/home/mawen/logs/app.log"
+	config, err := conn.ParseConfig(connString)
+	if err != nil {
+		return err
+	}
+	config.OnNotice = func(conn *conn.NdxConn, notice *conn.Notice) {
+		slog.Info("Receive conn notice", "message", notice.Message)
+	}
+	conn, err := conn.ConnectConfig(ctx, config)
+	if err != nil {
+		return err
+	}
+
+	slog.Info("Connection establish success", "conn", "cmd://mawen@localhost/home/mawen/logs/app.log")
+
+	a.conn = conn
+
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "green", "-", "🖳", 1))
+	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "orange", "-", "🖳", 0))
+	sb.WriteString(fmt.Sprintf("[%s:-:%s]%s %.2d[-:-:-]", "red", "-", "🖳", 0))
+
+	a.StatusLine().ShowLeft(sb.String())
 
 	return nil
 }
 
 func (a *App) Run() error {
-	//go func() {
-	//	a.QueueUpdateDraw(func() {
-	a.Main.SwitchToPage("main")
-	//})
-	//}()
+	go func() {
+		a.QueueUpdateDraw(func() {
+			a.Main.SwitchToPage("main")
+		})
+	}()
 
 	a.SetRunning(true)
 
@@ -71,18 +98,7 @@ func (a *App) keyboard(event *tcell.EventKey) *tcell.EventKey {
 }
 
 func (a *App) layout(ctx context.Context) {
-	top := tview.NewFlex().SetDirection(tview.FlexColumn)
-	top.AddItem(a.QueryLabel(), 12, 0, false)
-	top.AddItem(nil, 1, 0, false)
-	top.AddItem(a.Query(), 0, 1, true)
-	top.AddItem(nil, 1, 0, false)
-	top.AddItem(a.Time(), 6, 0, false)
-	top.AddItem(nil, 1, 0, false)
-	top.AddItem(a.Edit(), 6, 0, false)
-
-	main := tview.NewFlex().SetDirection(tview.FlexRow)
-	main.AddItem(top, 1, 0, true)
-	main.AddItem(a.Content, 0, 10, true)
+	main := NewMainPage(a)
 
 	a.Main.AddPage("main", main, true, false)
 }

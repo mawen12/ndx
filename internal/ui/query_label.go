@@ -1,40 +1,45 @@
 package ui
 
 import (
-	"log/slog"
-
-	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
 const (
 	queryLabelMatch    = "awk pattern: "
-	queryLabelMismatch = "awk pattern[yellow::b]*[-::-]"
+	queryLabelMismatch = "awk pattern[yellow::b]*[-::-]:"
 )
 
 type QueryLabel struct {
 	*tview.TextView
+
+	app *App
 }
 
-func NewQueryLabel() *QueryLabel {
+func NewQueryLabel(app *App) *QueryLabel {
 	q := &QueryLabel{
 		TextView: tview.NewTextView().
 			SetText(queryLabelMatch).
 			SetDynamicColors(true).
-			SetScrollable(false),
+			SetScrollable(false).
+			SetTextAlign(tview.AlignLeft),
+		app: app,
 	}
-
-	q.SetBackgroundColor(tcell.ColorWhite)
 
 	return q
 }
 
-func (q *QueryLabel) Enter(old, new string) {
-	slog.Info("old: %s, new: %s", old, new)
+func (q *QueryLabel) Name() string {
+	return "queryLabel"
+}
 
+func (q *QueryLabel) Enter(old, new string) {
 	if old != new {
 		q.SetText(queryLabelMismatch)
 	} else {
 		q.SetText(queryLabelMatch)
 	}
+}
+
+func (q *QueryLabel) Done(text string) {
+
 }

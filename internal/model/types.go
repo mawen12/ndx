@@ -20,6 +20,14 @@ type Igniter interface {
 	Stop()
 }
 
+type Focusable interface {
+	Primitive
+
+	SetFocus(prev Focusable)
+
+	UnFocus()
+}
+
 type Component interface {
 	Primitive
 	Igniter
