@@ -5,15 +5,8 @@ import (
 	"github.com/rivo/tview"
 )
 
-const (
-	Entering = iota
-	Entered
-)
-
 type QueryListener interface {
 	Enter(old, new string)
-
-	Done(new string)
 }
 
 type Query struct {
@@ -37,7 +30,7 @@ func NewQuery(app *App) *Query {
 	q.SetBlurFunc(q.inactivate)
 
 	q.SetChangedFunc(func(text string) {
-		q.notifyListener(Entering, text)
+		q.notifyListener(text)
 	})
 
 	return &q
@@ -60,16 +53,9 @@ func (q *Query) RemoveListener(l QueryListener) {
 	}
 }
 
-func (q *Query) notifyListener(event int, text string) {
-	switch event {
-	case Entering:
-		for _, listener := range q.listeners {
-			listener.Enter(q.last, text)
-		}
-	case Entered:
-		for _, listener := range q.listeners {
-			listener.Done(text)
-		}
+func (q *Query) notifyListener(text string) {
+	for _, listener := range q.listeners {
+		listener.Enter(q.last, text)
 	}
 }
 
@@ -78,11 +64,14 @@ func (q *Query) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	case tcell.KeyEsc:
 		q.app.activateTable()
 	case tcell.KeyTab:
+
 		q.app.activateEdit()
 	case tcell.KeyBacktab:
+
 		q.app.activateTable()
 	case tcell.KeyEnter:
-		q.notifyListener(Entered, q.GetText())
+		q.app.model.SetPattern(q.GetText())
+		q.app.model.DoQuery()
 	}
 
 	return event

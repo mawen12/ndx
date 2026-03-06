@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -60,6 +63,10 @@ func NewCommand(app *App) *Command {
 
 func (c *Command) Name() string {
 	return "cmd"
+}
+
+func (c *Command) ShowQueryDuration(duration time.Duration) {
+	c.SetText(fmt.Sprintf("Query cost %d", duration.Milliseconds()))
 }
 
 func (c *Command) SetFocus(prev tview.Primitive) {

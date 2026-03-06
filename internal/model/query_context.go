@@ -1,10 +1,14 @@
 package model
 
-import "time"
+import (
+	"time"
+)
 
 type QueryContext struct {
 	pattern   string
 	timeRange time.Time
+
+	QueryFunc func()
 }
 
 func NewQueryContext() *QueryContext {
@@ -25,4 +29,10 @@ func (qc *QueryContext) TimeRange() time.Time {
 
 func (qc *QueryContext) SetTimeRange(tr time.Time) {
 	qc.timeRange = tr
+}
+
+func (qc *QueryContext) DoQuery() {
+	if qc.QueryFunc != nil {
+		qc.QueryFunc()
+	}
 }

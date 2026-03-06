@@ -129,7 +129,8 @@ type execResult struct {
 	Result     model.QueryResult
 }
 
-func (p *Pool) Exec(ctx context.Context, pattern string, timeRange time.Time) (MergedResult, error) {
+func (p *Pool) Query(ctx context.Context, qc model.QueryContext) (MergedResult, error) {
+	start := time.Now()
 	resultCh := make(chan execResult)
 	var wg sync.WaitGroup
 	for connString, conn := range p.cs {
@@ -137,7 +138,7 @@ func (p *Pool) Exec(ctx context.Context, pattern string, timeRange time.Time) (M
 		go func() {
 			defer wg.Done()
 
-			ret := conn.Exec(ctx, pattern, timeRange)
+			ret := conn.Exec(ctx, qc.Pattern(), qc.TimeRange())
 			resultCh <- execResult{connString: connString, Result: ret}
 		}()
 	}
@@ -172,7 +173,8 @@ func (p *Pool) Exec(ctx context.Context, pattern string, timeRange time.Time) (M
 	})
 
 	return MergedResult{
-		Stat:  mergedStat,
-		Lines: mergedLines,
+		Stat:     mergedStat,
+		Lines:    mergedLines,
+		Duration: time.Since(start),
 	}, nil
 }

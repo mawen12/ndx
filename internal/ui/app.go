@@ -3,7 +3,7 @@ package ui
 import (
 	"sync"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -11,15 +11,17 @@ type App struct {
 	*tview.Application
 
 	Main    *Pages
+	model   *model.QueryContext
 	views   map[string]tview.Primitive
 	running bool
 	mx      sync.RWMutex
 }
 
-func NewApp() *App {
+func NewApp(m *model.QueryContext) *App {
 	a := App{
 		Application: tview.NewApplication(),
 		Main:        NewPages(),
+		model:       m,
 	}
 
 	a.views = map[string]tview.Primitive{
@@ -30,6 +32,7 @@ func NewApp() *App {
 		"table":      NewTable(&a),
 		"statusLine": NewStatusLine(&a),
 		"cmd":        NewCommand(&a),
+		"histogram":  NewHistogram(&a),
 	}
 
 	return &a
@@ -80,12 +83,16 @@ func (a *App) Query() *Query {
 	return a.views["query"].(*Query)
 }
 
+func (a *App) Time() *Time {
+	return a.views["time"].(*Time)
+}
+
 func (a *App) Edit() *Edit {
 	return a.views["edit"].(*Edit)
 }
 
-func (a *App) Time() *Time {
-	return a.views["time"].(*Time)
+func (a *App) Histogram() *Histogram {
+	return a.views["histogram"].(*Histogram)
 }
 
 func (a *App) Table() *Table {
@@ -108,23 +115,14 @@ func (a *App) activateEdit() {
 	a.SetFocus(a.Edit())
 }
 
+func (a *App) activateHistogram() {
+	a.SetFocus(a.Histogram())
+}
+
 func (a *App) activateTable() {
 	a.SetFocus(a.Table())
 }
 
 func (a *App) activateCmd(prev tview.Primitive) {
-	//a.SetFocus(a.Cmd())
 	a.Cmd().SetFocus(prev)
-}
-
-func AsKey(event *tcell.EventKey) tcell.Key {
-	if event.Key() != tcell.KeyRune {
-		return event.Key()
-	}
-
-	key := tcell.Key(event.Rune())
-	if event.Modifiers() == tcell.ModAlt {
-		key = tcell.Key(int16(event.Rune()) * int16(event.Modifiers()))
-	}
-	return key
 }

@@ -31,7 +31,7 @@ func (e *Edit) Name() string {
 func (e *Edit) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyTab:
-		e.app.activateTable()
+		e.app.activateHistogram()
 	case tcell.KeyBacktab:
 		e.app.activateQuery()
 	default:

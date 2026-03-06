@@ -1,12 +1,6 @@
 package view
 
 import (
-	"context"
-	"log/slog"
-	"time"
-
-	"github.com/gdamore/tcell/v2"
-	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -32,56 +26,10 @@ func NewMainPage(app *App) *MainPage {
 	top.AddItem(app.Edit(), 6, 0, false)
 
 	mp.AddItem(top, 1, 0, true)
+	mp.AddItem(app.Histogram(), 6, 0, false)
 	mp.AddItem(app.Table(), 0, 1, false)
 	mp.AddItem(app.StatusLine(), 1, 0, false)
 	mp.AddItem(app.Cmd(), 1, 0, false)
 
-	app.Query().AddListener(&mp)
-
 	return &mp
-}
-
-func (mp *MainPage) Enter(old, new string) {
-
-}
-
-func (mp *MainPage) Done(pattern string) {
-	// 查询数据
-	result, err := mp.app.pool.Exec(context.Background(), pattern, time.Now())
-	if err != nil {
-		slog.Error("Query Failed", "pattern", pattern, "error", err)
-		return
-	}
-	slog.Info("Query Success", "pattern", pattern, "records", len(result.Lines), "stat", result.Stat)
-
-	// clear old data
-	mp.app.Table().Clear()
-
-	// handle new data
-	newTableCell := func(line model.LogLine) *tview.TableCell {
-		tc := tview.NewTableCell(tview.Escape(line.OriginalLine())).
-			SetSelectable(true).
-			SetAttributes(tcell.AttrBold).
-			SetAttributes(tview.AlignLeft).
-			SetSelectedStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue)).
-			SetStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite))
-
-		tc.SetReference(line)
-
-		return tc
-	}
-
-	for i, line := range result.Lines {
-		mp.app.Table().SetCell(i, 0, newTableCell(line))
-	}
-
-	mp.app.Table().Select(len(result.Lines)-1, 0)
-	mp.app.Table().ScrollToEnd()
-
-	// show status line
-	//slog.Info("query cost", "cost", result.Cost.Milliseconds())
-
-	//mp.app.StatusLine().ShowRight(fmt.Sprintf("%d / %d", mp.app.conn.))
-	//mp.app.Cmd().SetText(fmt.Sprintf("Query took: %dms", result.Cost.Milliseconds()))
-
 }

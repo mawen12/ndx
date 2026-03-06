@@ -11,6 +11,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal"
+	"github.com/mawen12/ndx/internal/model"
 	"github.com/mawen12/ndx/internal/pool"
 	"github.com/mawen12/ndx/internal/ui"
 )
@@ -19,14 +20,21 @@ type App struct {
 	*ui.App
 	Content *PageStack
 
-	pool *pool.Pool
+	model       *model.QueryContext
+	pool        *pool.Pool
+	queryCancel context.CancelFunc
 }
 
 func NewApp() *App {
+	qc := model.NewQueryContext()
+
 	a := App{
-		App:     ui.NewApp(),
+		App:     ui.NewApp(qc),
 		Content: NewPageStack(),
+		model:   qc,
 	}
+
+	qc.QueryFunc = a.doQuery
 
 	return &a
 }
@@ -52,8 +60,6 @@ func (a *App) Init(conns string) error {
 	}
 
 	p.AddListener(a)
-
-	slog.Info("Connection establish success", "conn", "cmd://mawen@localhost/home/mawen/logs/app.log")
 
 	a.pool = p
 
@@ -114,4 +120,18 @@ func (a *App) OnStat(stat pool.Stat) {
 	a.QueueUpdateDraw(func() {
 		a.StatusLine().ShowLeft(sb.String())
 	})
+}
+
+func (a *App) doQuery() {
+	result, err := a.pool.Query(context.Background(), *a.model)
+	if err != nil {
+		slog.Error("Query Failed", "queryContext", a.model, "err", err)
+		return
+	}
+
+	a.Histogram().SetData(result.Stat)
+
+	a.Table().ShowLogs(result.Lines)
+
+	a.Cmd().ShowQueryDuration(result.Duration)
 }

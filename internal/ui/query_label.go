@@ -39,7 +39,3 @@ func (q *QueryLabel) Enter(old, new string) {
 		q.SetText(queryLabelMatch)
 	}
 }
-
-func (q *QueryLabel) Done(text string) {
-
-}
