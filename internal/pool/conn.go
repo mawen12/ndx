@@ -4,38 +4,39 @@ import (
 	"context"
 	"time"
 
-	"github.com/mawen12/ndx/internal/conn"
+	"github.com/mawen12/ndx/internal/logclient"
+	"github.com/mawen12/ndx/internal/model"
 )
 
 type Conn struct {
+	model.LogClient
 	connString string
-	*conn.NdxConn
-	err error
+	err        error
 }
 
 func NewConn(ctx context.Context, connString string) *Conn {
-	c, err := conn.Connect(ctx, connString)
+	c, err := logclient.Connect(ctx, connString)
 
 	return &Conn{
 		connString: connString,
-		NdxConn:    c,
+		LogClient:  c,
 		err:        err,
 	}
 }
 
 func (c *Conn) Reconnect(ctx context.Context) {
 	if c.IsClosed() {
-		con, err := conn.Connect(ctx, c.connString)
+		con, err := logclient.Connect(ctx, c.connString)
 
-		c.NdxConn = con
+		c.LogClient = con
 		c.err = err
 	}
 }
 
-func (c *Conn) Exec(ctx context.Context, pattern string, timeRange time.Time) *conn.Result {
-	if c.IsClosed() {
-		return &conn.Result{Err: c.err}
-	}
+func (c *Conn) Exec(ctx context.Context, pattern string, timeRange time.Time) model.QueryResult {
+	//if c.IsClosed() {
+	//	return &logclient.QueryResult{err: c.err}
+	//}
 
-	return c.NdxConn.Exec(ctx, pattern, timeRange).Read()
+	return c.LogClient.Execute(ctx, pattern, timeRange).Read()
 }

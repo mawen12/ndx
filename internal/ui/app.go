@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"log/slog"
 	"sync"
 
 	"github.com/gdamore/tcell/v2"
@@ -12,7 +11,6 @@ type App struct {
 	*tview.Application
 
 	Main    *Pages
-	actions *KeyActions
 	views   map[string]tview.Primitive
 	running bool
 	mx      sync.RWMutex
@@ -38,8 +36,6 @@ func NewApp() *App {
 }
 
 func (a *App) Init() {
-	a.bindKeys()
-
 	a.Query().AddListener(a.QueryLabel())
 
 	a.SetRoot(a.Main, true)
@@ -75,13 +71,6 @@ func (a *App) QueueUpdateDraw(f func()) {
 	}()
 }
 
-func (a *App) bindKeys() {
-	slog.Error("bindKeys not implemented")
-	a.actions = NewKeyActionsFromMap(KeyMap{
-		//KeyColon: NewKeyAction("Cmd", , false),
-	})
-}
-
 // View Accessors
 func (a *App) QueryLabel() *QueryLabel {
 	return a.views["queryLabel"].(*QueryLabel)
@@ -109,6 +98,23 @@ func (a *App) StatusLine() *StatusLine {
 
 func (a *App) Cmd() *Command {
 	return a.views["cmd"].(*Command)
+}
+
+func (a *App) activateQuery() {
+	a.SetFocus(a.Query())
+}
+
+func (a *App) activateEdit() {
+	a.SetFocus(a.Edit())
+}
+
+func (a *App) activateTable() {
+	a.SetFocus(a.Table())
+}
+
+func (a *App) activateCmd(prev tview.Primitive) {
+	//a.SetFocus(a.Cmd())
+	a.Cmd().SetFocus(prev)
 }
 
 func AsKey(event *tcell.EventKey) tcell.Key {

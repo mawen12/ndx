@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/mawen12/ndx/internal/conn"
+	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -58,8 +58,8 @@ func (mp *MainPage) Done(pattern string) {
 	mp.app.Table().Clear()
 
 	// handle new data
-	newTableCell := func(line conn.LineInfo) *tview.TableCell {
-		tc := tview.NewTableCell(tview.Escape(line.OriginLine)).
+	newTableCell := func(line model.LogLine) *tview.TableCell {
+		tc := tview.NewTableCell(tview.Escape(line.OriginalLine())).
 			SetSelectable(true).
 			SetAttributes(tcell.AttrBold).
 			SetAttributes(tview.AlignLeft).

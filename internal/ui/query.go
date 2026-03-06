@@ -2,7 +2,6 @@ package ui
 
 import (
 	"github.com/gdamore/tcell/v2"
-	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -31,13 +30,15 @@ func NewQuery(app *App) *Query {
 		app:        app,
 	}
 
-	q.SetFieldStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue).Bold(true))
+	q.SetInputCapture(q.keyboard)
+
+	q.SetFocusFunc(q.activate)
+
+	q.SetBlurFunc(q.inactivate)
 
 	q.SetChangedFunc(func(text string) {
 		q.notifyListener(Entering, text)
 	})
-
-	q.SetInputCapture(q.eventHandle)
 
 	return &q
 }
@@ -72,17 +73,14 @@ func (q *Query) notifyListener(event int, text string) {
 	}
 }
 
-func (q *Query) eventHandle(event *tcell.EventKey) *tcell.EventKey {
+func (q *Query) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyEsc:
-		q.UnFocus()
-		q.app.Table().SetFocus(q)
+		q.app.activateTable()
 	case tcell.KeyTab:
-		q.UnFocus()
-		q.app.Edit().SetFocus(q)
+		q.app.activateEdit()
 	case tcell.KeyBacktab:
-		q.UnFocus()
-		q.app.Table().SetFocus(q)
+		q.app.activateTable()
 	case tcell.KeyEnter:
 		q.notifyListener(Entered, q.GetText())
 	}
@@ -90,11 +88,10 @@ func (q *Query) eventHandle(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
-func (q *Query) SetFocus(prev model.Focusable) {
-	q.app.SetFocus(q)
+func (q *Query) activate() {
 	q.SetFieldStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue).Bold(true))
 }
 
-func (q *Query) UnFocus() {
+func (q *Query) inactivate() {
 	q.SetFieldStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite).Bold(true))
 }

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-type CmdConn struct {
+type CommandConn struct {
 	cmd *exec.Cmd
 
 	stdin io.WriteCloser
@@ -16,7 +16,7 @@ type CmdConn struct {
 	stdout, stderr *bufio.Reader
 }
 
-func NewCmdConn(ctx context.Context, command string, arg ...string) (*CmdConn, error) {
+func NewCommandConn(ctx context.Context, command string, arg ...string) (*CommandConn, error) {
 	cmd := exec.CommandContext(ctx, command, arg...)
 
 	// TODO close when error occur
@@ -44,10 +44,10 @@ func NewCmdConn(ctx context.Context, command string, arg ...string) (*CmdConn, e
 	stdoutBuf := bufio.NewReader(stdout)
 	stderrBuf := bufio.NewReader(stderr)
 
-	return &CmdConn{cmd: cmd, stdin: stdin, stdout: stdoutBuf, stderr: stderrBuf}, nil
+	return &CommandConn{cmd: cmd, stdin: stdin, stdout: stdoutBuf, stderr: stderrBuf}, nil
 }
 
-func (c *CmdConn) Readout() (line string, err error) {
+func (c *CommandConn) Readout() (line string, err error) {
 	if !c.ok() {
 		return "", &connInvalidErr{}
 	}
@@ -56,18 +56,18 @@ func (c *CmdConn) Readout() (line string, err error) {
 	return strings.TrimRight(line, "\r\n"), err
 }
 
-func (c *CmdConn) Write(b []byte) (n int, err error) {
+func (c *CommandConn) Write(b []byte) (n int, err error) {
 	if !c.ok() {
 		return 0, &connInvalidErr{}
 	}
 	return c.stdin.Write(b)
 }
 
-func (c *CmdConn) Close() error {
+func (c *CommandConn) Close() error {
 	c.stdin.Close()
 	return c.cmd.Wait()
 }
 
-func (c *CmdConn) ok() bool {
+func (c *CommandConn) ok() bool {
 	return c != nil && c.cmd != nil && c.stdin != nil && c.stdout != nil && c.stderr != nil
 }

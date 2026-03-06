@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mawen12/ndx/internal/conn"
+	"github.com/mawen12/ndx/internal/model"
 )
 
 type Pool struct {
-	conns map[string]Conn
+	cs map[string]Conn
 
 	cancel    context.CancelFunc
 	listeners []StatListener
@@ -27,13 +27,13 @@ func Connect(connString string) (*Pool, error) {
 
 	p := Pool{}
 
-	p.conns = make(map[string]Conn)
+	p.cs = make(map[string]Conn)
+	ctx := context.Background()
 	for _, part := range parts {
-		con := NewConn(context.Background(), part)
-		p.conns[part] = *con
+		con := NewConn(ctx, part)
+		p.cs[part] = *con
 	}
 
-	ctx := context.Background()
 	ctx, p.cancel = context.WithCancel(ctx)
 
 	go p.run(ctx)
@@ -104,7 +104,7 @@ func (s Stat) String() string {
 
 func (p *Pool) Stat() (s Stat) {
 	s.ClosedConns = make(map[string]Conn)
-	for _, conn := range p.conns {
+	for _, conn := range p.cs {
 		if conn.IsClosed() {
 			s.Closed++
 			s.ClosedConns[conn.connString] = conn
@@ -119,20 +119,20 @@ func (p *Pool) Stat() (s Stat) {
 
 func (p *Pool) Close() {
 	p.cancel()
-	for _, c := range p.conns {
+	for _, c := range p.cs {
 		_ = c.Close()
 	}
 }
 
 type execResult struct {
 	connString string
-	Result     *conn.Result
+	Result     model.QueryResult
 }
 
 func (p *Pool) Exec(ctx context.Context, pattern string, timeRange time.Time) (MergedResult, error) {
 	resultCh := make(chan execResult)
 	var wg sync.WaitGroup
-	for connString, conn := range p.conns {
+	for connString, conn := range p.cs {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -149,26 +149,26 @@ func (p *Pool) Exec(ctx context.Context, pattern string, timeRange time.Time) (M
 
 	var errs []error
 	mergedStat := make(map[int64]int)
-	var mergedLines []conn.LineInfo
+	var mergedLines []model.LogLine
 	for ch := range resultCh {
-		if ch.Result.Err != nil {
-			errs = append(errs, ch.Result.Err)
+		if ch.Result.Err() != nil {
+			errs = append(errs, ch.Result.Err())
 			continue
 		}
 
 		// handle stat
-		for m, c := range ch.Result.Stat {
+		for m, c := range ch.Result.Statistics() {
 			mergedStat[m] += c
 		}
 
 		// handle line
-		for _, lineInfo := range ch.Result.Lines {
+		for _, lineInfo := range ch.Result.Lines() {
 			mergedLines = append(mergedLines, lineInfo)
 		}
 	}
 
 	sort.SliceStable(mergedLines, func(i, j int) bool {
-		return mergedLines[i].Time.Before(mergedLines[j].Time)
+		return mergedLines[i].Time().Before(mergedLines[j].Time())
 	})
 
 	return MergedResult{

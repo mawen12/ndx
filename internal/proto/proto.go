@@ -2,7 +2,6 @@ package proto
 
 import (
 	_ "embed"
-	"io"
 
 	"github.com/mawen12/ndx/internal/model"
 )
@@ -33,8 +32,7 @@ var (
 )
 
 type Frontend struct {
-	sr model.StringReader
-	w  io.Writer
+	model.Connection
 
 	startupMessage  StartupMessage
 	dataLine        DataLine
@@ -45,8 +43,8 @@ type Frontend struct {
 	readyForQuery   ReadyForQuery
 }
 
-func NewFrontend(sr model.StringReader, w io.Writer) *Frontend {
-	return &Frontend{sr: sr, w: w}
+func NewFrontend(c model.Connection) *Frontend {
+	return &Frontend{Connection: c}
 }
 
 func (f *Frontend) Send(msg model.FrontendMessage) error {
@@ -55,12 +53,12 @@ func (f *Frontend) Send(msg model.FrontendMessage) error {
 		return err
 	}
 
-	_, err = f.w.Write(buf)
+	_, err = f.Write(buf)
 	return err
 }
 
 func (f *Frontend) Receive() (model.BackendMessage, error) {
-	line, err := f.sr.Next()
+	line, err := f.Readout()
 
 	var msg model.BackendMessage
 	switch line[0] {

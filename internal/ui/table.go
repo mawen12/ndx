@@ -2,7 +2,6 @@ package ui
 
 import (
 	"github.com/gdamore/tcell/v2"
-	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -18,7 +17,11 @@ func NewTable(app *App) *Table {
 		app:   app,
 	}
 
-	t.SetInputCapture(t.eventHandle)
+	t.SetInputCapture(t.keyboard)
+
+	t.SetFocusFunc(t.activate)
+
+	t.SetBlurFunc(t.inactivate)
 
 	return &t
 }
@@ -27,33 +30,28 @@ func (t *Table) Name() string {
 	return "table"
 }
 
-func (t *Table) eventHandle(event *tcell.EventKey) *tcell.EventKey {
+func (t *Table) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyTab:
-		t.UnFocus()
-		t.app.Query().SetFocus(t)
+		t.app.activateQuery()
 	case tcell.KeyBacktab:
-		t.UnFocus()
-		t.app.Edit().SetFocus(t)
+		t.app.activateEdit()
 	default:
 		switch event.Rune() {
 		case 'i':
-			t.UnFocus()
-			t.app.Query().SetFocus(t)
+			t.app.activateQuery()
 		case ':':
-			t.UnFocus()
-			t.app.Cmd().SetFocus(t)
+			t.app.activateCmd(t)
 		}
 	}
 
 	return event
 }
 
-func (t *Table) SetFocus(prev model.Focusable) {
-	t.app.SetFocus(t)
+func (t *Table) activate() {
 	t.SetSelectable(true, false)
 }
 
-func (t *Table) UnFocus() {
+func (t *Table) inactivate() {
 	t.SetSelectable(false, false)
 }

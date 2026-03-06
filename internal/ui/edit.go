@@ -2,7 +2,6 @@ package ui
 
 import (
 	"github.com/gdamore/tcell/v2"
-	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -20,7 +19,7 @@ func NewEdit(app *App) *Edit {
 
 	e.Button.SetTitleAlign(tview.AlignCenter)
 
-	e.SetInputCapture(e.eventHandle)
+	e.SetInputCapture(e.keyboard)
 
 	return &e
 }
@@ -29,29 +28,18 @@ func (e *Edit) Name() string {
 	return "edit"
 }
 
-func (e *Edit) eventHandle(event *tcell.EventKey) *tcell.EventKey {
+func (e *Edit) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyTab:
-		e.UnFocus()
-		e.app.Table().SetFocus(e)
+		e.app.activateTable()
 	case tcell.KeyBacktab:
-		e.UnFocus()
-		e.app.Query().SetFocus(e)
+		e.app.activateQuery()
 	default:
 		switch event.Rune() {
 		case ':':
-			e.UnFocus()
-			e.app.Cmd().SetFocus(e)
+			e.app.activateCmd(e)
 		}
 	}
 
 	return event
-}
-
-func (e *Edit) SetFocus(prev model.Focusable) {
-	e.app.SetFocus(e)
-}
-
-func (e *Edit) UnFocus() {
-
 }

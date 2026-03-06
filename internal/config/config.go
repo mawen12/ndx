@@ -1,21 +1,30 @@
-package conn
+package config
 
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+	"github.com/mawen12/ndx/internal/conn"
 	"github.com/mawen12/ndx/internal/model"
 	"github.com/mawen12/ndx/internal/proto"
-
-	"github.com/google/uuid"
 )
 
 type GetSSLPasswordFunc func(ctx context.Context) string
+
+type DialFunc func(ctx context.Context, config Config) (model.Connection, error)
+
+type BuildFrontendFunc func(conn model.Connection) model.Frontend
+
+type Notice struct {
+	Message string
+}
+
+type NoticeHandler func(model.LogClient, *Notice)
 
 type Config struct {
 	Scheme        string
@@ -32,7 +41,7 @@ type Config struct {
 	Fallbacks            []*FallbackConfig
 	OnNotice             NoticeHandler
 	PathPrefix           string
-	createdByParseConfig bool
+	CreatedByParseConfig bool
 }
 
 type FallbackConfig struct {
@@ -59,7 +68,7 @@ func ParseConfig(connString string) (*Config, error) {
 	settings := mergeSettings(defaultSettings, connStringSettings)
 
 	config := &Config{
-		createdByParseConfig: true,
+		CreatedByParseConfig: true,
 		Scheme:               settings["scheme"],
 		Host:                 settings["host"],
 		User:                 settings["user"],
@@ -161,22 +170,19 @@ func isIPOnly(host string) bool {
 }
 
 func makeDefaultBuildFrontendFunc() BuildFrontendFunc {
-	return func(conn model.Conn, w io.Writer) Frontend {
-		sr := NewStringReader(conn)
-		frontend := proto.NewFrontend(sr, w)
-
-		return frontend
+	return func(conn model.Connection) model.Frontend {
+		return proto.NewFrontend(conn)
 	}
 }
 
 func makeDialFunc(scheme string, host string) DialFunc {
 	switch scheme {
 	case "cmd":
-		return func(ctx context.Context, config Config) (model.Conn, error) {
+		return func(ctx context.Context, config Config) (model.Connection, error) {
 			return NewCmdConnConfig(ctx, config)
 		}
 	case "ssh":
-		return func(ctx context.Context, config Config) (model.Conn, error) {
+		return func(ctx context.Context, config Config) (model.Connection, error) {
 			return NewShellConnConfig(ctx, config)
 		}
 	default:
@@ -184,10 +190,10 @@ func makeDialFunc(scheme string, host string) DialFunc {
 	}
 }
 
-func NewCmdConnConfig(ctx context.Context, config Config) (*CmdConn, error) {
-	return NewCmdConn(ctx, config.Command)
+func NewCmdConnConfig(ctx context.Context, config Config) (*conn.CommandConn, error) {
+	return conn.NewCommandConn(ctx, config.Command)
 }
 
-func NewShellConnConfig(ctx context.Context, config Config) (*ShellConn, error) {
-	return NewShellConn(ctx, fmt.Sprintf("%s:%d", config.Host, int(config.Port)), config.User, config.Password)
+func NewShellConnConfig(ctx context.Context, config Config) (*conn.SSHConn, error) {
+	return conn.NewSSHConn(ctx, fmt.Sprintf("%s:%d", config.Host, int(config.Port)), config.User, config.Password)
 }

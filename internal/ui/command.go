@@ -1,10 +1,7 @@
 package ui
 
 import (
-	"log/slog"
-
 	"github.com/gdamore/tcell/v2"
-	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -43,7 +40,7 @@ type Command struct {
 	*tview.InputField
 
 	app  *App
-	prev model.Focusable
+	prev tview.Primitive
 }
 
 func NewCommand(app *App) *Command {
@@ -52,7 +49,11 @@ func NewCommand(app *App) *Command {
 		app:        app,
 	}
 
-	c.SetInputCapture(c.eventHandle)
+	c.SetInputCapture(c.keyboard)
+
+	c.SetFocusFunc(c.activate)
+
+	c.SetBlurFunc(c.inactivate)
 
 	return &c
 }
@@ -61,22 +62,25 @@ func (c *Command) Name() string {
 	return "cmd"
 }
 
-func (c *Command) eventHandle(event *tcell.EventKey) *tcell.EventKey {
+func (c *Command) SetFocus(prev tview.Primitive) {
+	c.prev = prev
+	c.app.SetFocus(c)
+}
+
+func (c *Command) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	switch event.Key() {
 	case tcell.KeyEsc:
-		c.UnFocus()
-		c.prev.SetFocus(c)
+		c.app.SetFocus(c.prev)
 	}
 	return event
 }
 
-func (c *Command) SetFocus(prev model.Focusable) {
-	slog.Info("into command", "prev", prev.Name())
-	c.prev = prev
-	c.app.SetFocus(c)
+func (c *Command) activate() {
+	c.SetFieldStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue).Bold(true))
 	c.SetText(":")
 }
 
-func (c *Command) UnFocus() {
+func (c *Command) inactivate() {
+	c.SetFieldStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite).Bold(true))
 	c.SetText("")
 }

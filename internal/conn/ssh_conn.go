@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type ShellConn struct {
+type SSHConn struct {
 	client  *ssh.Client
 	session *ssh.Session
 
@@ -18,7 +18,7 @@ type ShellConn struct {
 	stdout, stderr *bufio.Reader
 }
 
-func NewShellConn(ctx context.Context, address, user, password string) (*ShellConn, error) {
+func NewSSHConn(ctx context.Context, address, user, password string) (*SSHConn, error) {
 	c, err := ssh.Dial("tcp", address, &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{
@@ -57,10 +57,10 @@ func NewShellConn(ctx context.Context, address, user, password string) (*ShellCo
 	stdoutBuf := bufio.NewReader(stdout)
 	stderrBuf := bufio.NewReader(stderr)
 
-	return &ShellConn{client: c, session: s, stdin: stdin, stdout: stdoutBuf, stderr: stderrBuf}, nil
+	return &SSHConn{client: c, session: s, stdin: stdin, stdout: stdoutBuf, stderr: stderrBuf}, nil
 }
 
-func (s *ShellConn) Readout() (line string, err error) {
+func (s *SSHConn) Readout() (line string, err error) {
 	if !s.ok() {
 		return "", &connInvalidErr{}
 	}
@@ -68,14 +68,14 @@ func (s *ShellConn) Readout() (line string, err error) {
 	return strings.TrimRight(line, "\r\n"), err
 }
 
-func (s *ShellConn) Write(p []byte) (n int, err error) {
+func (s *SSHConn) Write(p []byte) (n int, err error) {
 	if !s.ok() {
 		return 0, &connInvalidErr{}
 	}
 	return s.stdin.Write(p)
 }
 
-func (s *ShellConn) Close() error {
+func (s *SSHConn) Close() error {
 	if !s.ok() {
 		return &connInvalidErr{}
 	}
@@ -83,6 +83,6 @@ func (s *ShellConn) Close() error {
 	return s.session.Close()
 }
 
-func (s *ShellConn) ok() bool {
+func (s *SSHConn) ok() bool {
 	return s != nil && s.session != nil && s.stdin != nil && s.stdout != nil && s.stderr != nil
 }
