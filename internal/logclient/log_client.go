@@ -81,11 +81,6 @@ func connect(ctx context.Context, config *config.Config) (model.LogClient, error
 		LogFile:    config.LogFile,
 	}
 
-	//buf, err := startupMsg.Encode(ndConn.wbuf)
-	//if err != nil {
-	//	return nil, &connectError{config: config, msg: "failed to write startup message", err: err}
-	//}
-
 	if err := c.frontend.Send(startupMsg); err != nil {
 		c.conn.Close()
 		return nil, &connectError{config: config, msg: "failed to write startup message", err: err}
@@ -123,49 +118,7 @@ func connect(ctx context.Context, config *config.Config) (model.LogClient, error
 	}
 }
 
-func (c *LogClient) Close() error {
-	if c.status == connStatusClosed {
-		return nil
-	}
-	c.status = connStatusClosed
-
-	defer close(c.cleanupDone)
-	defer c.conn.Close()
-
-	close := proto.Close{
-		PathPrefix: c.config.PathPrefix,
-	}
-	buf, err := close.Encode(nil)
-	if err == nil {
-		c.conn.Write(buf)
-	} else {
-		return err
-	}
-
-	return c.conn.Close()
-}
-
-func (c *LogClient) asyncClose() {
-	if c.status == connStatusClosed {
-		return
-	}
-	c.status = connStatusClosed
-
-	go func() {
-		defer close(c.cleanupDone)
-		defer c.conn.Close()
-
-		close := proto.Close{
-			PathPrefix: c.config.PathPrefix,
-		}
-		buf, err := close.Encode(nil)
-		if err == nil {
-			c.conn.Write(buf)
-		}
-	}()
-}
-
-func (c *LogClient) Execute(ctx context.Context, pattern string, timeRange time.Time) model.ResultStream {
+func (c *LogClient) Execute(ctx context.Context, pattern string, from, to time.Time) model.ResultStream {
 	if err := c.lock(); err != nil {
 		return &ResultStream{closed: true, err: err}
 	}
@@ -180,6 +133,13 @@ func (c *LogClient) Execute(ctx context.Context, pattern string, timeRange time.
 		ID:         "1",
 		LogFile:    c.config.LogFile,
 		Pattern:    pattern,
+	}
+
+	if !from.IsZero() {
+		queryMsg.From = from.In(c.location).Format("2006-01-02-15:04")
+	}
+	if !to.IsZero() {
+		queryMsg.To = to.In(c.location).Format("2006-01-02-15:04")
 	}
 
 	if err := c.frontend.Send(queryMsg); err != nil {
@@ -260,6 +220,48 @@ func (c *LogClient) peekMessage() (model.BackendMessage, error) {
 
 	c.peekedMsg = msg
 	return msg, nil
+}
+
+func (c *LogClient) Close() error {
+	if c.status == connStatusClosed {
+		return nil
+	}
+	c.status = connStatusClosed
+
+	defer close(c.cleanupDone)
+	defer c.conn.Close()
+
+	close := proto.Close{
+		PathPrefix: c.config.PathPrefix,
+	}
+	buf, err := close.Encode(nil)
+	if err == nil {
+		c.conn.Write(buf)
+	} else {
+		return err
+	}
+
+	return c.conn.Close()
+}
+
+func (c *LogClient) asyncClose() {
+	if c.status == connStatusClosed {
+		return
+	}
+	c.status = connStatusClosed
+
+	go func() {
+		defer close(c.cleanupDone)
+		defer c.conn.Close()
+
+		close := proto.Close{
+			PathPrefix: c.config.PathPrefix,
+		}
+		buf, err := close.Encode(nil)
+		if err == nil {
+			c.conn.Write(buf)
+		}
+	}()
 }
 
 func (c *LogClient) CleanupDone() chan struct{} {

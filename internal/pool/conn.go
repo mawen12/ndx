@@ -33,10 +33,10 @@ func (c *Conn) Reconnect(ctx context.Context) {
 	}
 }
 
-func (c *Conn) Exec(ctx context.Context, pattern string, timeRange time.Time) model.QueryResult {
+func (c *Conn) Exec(ctx context.Context, pattern string, from, to time.Time) model.QueryResult {
 	//if c.IsClosed() {
 	//	return &logclient.QueryResult{err: c.err}
 	//}
 
-	return c.LogClient.Execute(ctx, pattern, timeRange).Read()
+	return c.LogClient.Execute(ctx, pattern, from, to).Read()
 }

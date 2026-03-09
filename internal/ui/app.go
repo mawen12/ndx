@@ -25,6 +25,7 @@ func NewApp(m *model.QueryContext) *App {
 	}
 
 	a.views = map[string]tview.Primitive{
+		"topFlex":    tview.NewFlex(),
 		"queryLabel": NewQueryLabel(&a),
 		"query":      NewQuery(&a),
 		"time":       NewTime(&a),
@@ -33,6 +34,7 @@ func NewApp(m *model.QueryContext) *App {
 		"statusLine": NewStatusLine(&a),
 		"cmd":        NewCommand(&a),
 		"histogram":  NewHistogram(&a),
+		"edit_view":  NewEditView(&a),
 	}
 
 	return &a
@@ -40,6 +42,8 @@ func NewApp(m *model.QueryContext) *App {
 
 func (a *App) Init() {
 	a.Query().AddListener(a.QueryLabel())
+
+	a.EditView().Init()
 
 	a.SetRoot(a.Main, true)
 }
@@ -74,6 +78,17 @@ func (a *App) QueueUpdateDraw(f func()) {
 	}()
 }
 
+func (a *App) ShowModal(name string, p tview.Primitive) {
+	modalGrid := tview.NewGrid().
+		SetColumns(0, 105, 0).
+		SetRows(0, 20, 0).
+		AddItem(p, 1, 1, 1, 1, 0, 0, true)
+
+	a.Main.AddPage(name, modalGrid, true, true)
+
+	a.SetFocus(p)
+}
+
 // View Accessors
 func (a *App) QueryLabel() *QueryLabel {
 	return a.views["queryLabel"].(*QueryLabel)
@@ -105,6 +120,10 @@ func (a *App) StatusLine() *StatusLine {
 
 func (a *App) Cmd() *Command {
 	return a.views["cmd"].(*Command)
+}
+
+func (a *App) EditView() *EditView {
+	return a.views["edit_view"].(*EditView)
 }
 
 func (a *App) activateQuery() {

@@ -25,9 +25,9 @@ func (src *Query) Encode(dst []byte) ([]byte, error) {
 		"MaxNumLines": MaxNumLines,
 		"LogFile":     src.LogFile,
 		"FromExists":  src.From != "",
-		"From":        src.From,
+		"From":        shellQuote(src.From),
 		"ToExists":    src.To != "",
-		"To":          src.To,
+		"To":          shellQuote(src.To),
 		"Pattern":     shellQuote(src.Pattern),
 		"ID":          src.ID,
 	})

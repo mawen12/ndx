@@ -21,6 +21,8 @@ func NewEdit(app *App) *Edit {
 
 	e.SetInputCapture(e.keyboard)
 
+	e.SetSelectedFunc(e.selected)
+
 	return &e
 }
 
@@ -42,4 +44,9 @@ func (e *Edit) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	}
 
 	return event
+}
+
+func (e *Edit) selected() {
+	//e.app.ShowModal("edit_view", e.app.EditView())
+	e.app.EditView().Show()
 }

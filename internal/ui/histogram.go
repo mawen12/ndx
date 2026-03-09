@@ -7,6 +7,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/pkg/histogram"
+	"github.com/mawen12/ndx/pkg/timefmt"
 )
 
 type Histogram struct {
@@ -28,9 +29,9 @@ func NewHistogram(app *App) *Histogram {
 
 		t := time.Unix(int64(v), 0).In(tz)
 		if t.Hour() == 0 && t.Minute() == 0 {
-			return t.In(tz).Format("[yellow]Jan02[-]")
+			return t.In(tz).Format(fmt.Sprintf("[yellow]%s[-]", timefmt.MonthDay))
 		}
-		return t.In(tz).Format("15:04")
+		return t.In(tz).Format(timefmt.HourMinute)
 	})
 
 	h.SetCursorFormat(func(from int, to *int, width int) string {
@@ -38,13 +39,13 @@ func NewHistogram(app *App) *Histogram {
 		fromTime := time.Unix(int64(from), 0).In(tz)
 
 		if to == nil {
-			return fromTime.In(tz).Format("Jan02 15:04")
+			return fromTime.In(tz).Format(timefmt.MonthDayHourMinute)
 		}
 
 		toTime := time.Unix(int64(*to), 0).In(tz)
 
 		formatter := func(t time.Time) string {
-			return t.In(tz).Format("Jan02 15:04")
+			return t.In(tz).Format(timefmt.MonthDayHourMinute)
 		}
 
 		return fmt.Sprintf("%s - %s (%s)", formatter(fromTime), formatter(toTime), strings.TrimSuffix(toTime.Sub(fromTime).String(), "0s"))

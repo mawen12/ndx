@@ -138,7 +138,7 @@ func (p *Pool) Query(ctx context.Context, qc model.QueryContext) (MergedResult, 
 		go func() {
 			defer wg.Done()
 
-			ret := conn.Exec(ctx, qc.Pattern(), qc.TimeRange())
+			ret := conn.Exec(ctx, qc.Pattern, qc.TimeRange.ActualFrom, qc.TimeRange.ActualQuery)
 			resultCh <- execResult{connString: connString, Result: ret}
 		}()
 	}

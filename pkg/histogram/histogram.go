@@ -171,6 +171,11 @@ func (h *Histogram) Draw(screen tcell.Screen) {
 	}
 	tview.Print(screen, maxLabel, x+maxLabelOffset, y, width-maxLabelOffset, tview.AlignLeft, tcell.ColorWhite)
 
+	maxCoord := h.valToCoord(h.to)
+	maxOffset := (maxCoord + 1) / 2
+	rulerBlank := "[:#656565]" + strings.Repeat(" ", maxOffset) + "[:-]"
+	tview.Print(screen, rulerBlank, x+fldMarginLeft, y+height-1, width-fldMarginLeft, tview.AlignLeft, tcell.ColorWhite)
+
 	h.curMarks = h.getXMarks(h.from, h.to, width-fldMarginLeft)
 
 	sb := strings.Builder{}
@@ -200,7 +205,7 @@ func (h *Histogram) Draw(screen tcell.Screen) {
 		numRunes += len(clearViewFormatting(markStr))
 	}
 
-	ruleStr := ruleBuffer.String()
+	ruleStr := sb.String()
 	tview.Print(screen, ruleStr, x+fldMarginLeft, y+height-1, width-fldMarginLeft, tview.AlignLeft, tcell.ColorWhite)
 	ruleBuffer.WriteAt(x+fldMarginLeft, clearViewFormatting(ruleStr))
 
@@ -282,7 +287,7 @@ func (h *Histogram) InputHandler() func(event *tcell.EventKey, setFocus func(p t
 		maxCursor := h.alignCursor(h.to-h.binSize*h.getDataBinsInChartBar(), true)
 
 		moveLeft := func() {
-			h.cursor = h.binSize * h.getDataBinsInChartBar()
+			h.cursor -= h.binSize * h.getDataBinsInChartBar()
 			if h.cursor < h.from {
 				h.cursor = h.from
 			}
@@ -527,7 +532,7 @@ func (h *Histogram) getFieldData(width, height int) *fieldData {
 
 			if on {
 				for i := 0; i < chartBarWidth; i++ {
-					dots[height-y][xChart+i] = true
+					dots[height-y-1][xChart+i] = true
 				}
 			}
 		}
@@ -711,12 +716,4 @@ func clearViewFormatting(input string) string {
 	}
 
 	return output.String()
-}
-
-func highlightRune(s string, index int, prefix, suffix string) string {
-	runes := []rune(s)
-	if index >= 0 && index < len(runes) {
-		return string(runes[:index]) + prefix + string(runes[index]) + suffix + string(runes[index+1:])
-	}
-	return s
 }

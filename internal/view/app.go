@@ -129,6 +129,7 @@ func (a *App) doQuery() {
 		return
 	}
 
+	a.Histogram().SetRange(int(a.model.TimeRange.ActualFrom.Unix()), int(a.model.TimeRange.ActualTo.Unix()))
 	a.Histogram().SetData(result.Stat)
 
 	a.Table().ShowLogs(result.Lines)

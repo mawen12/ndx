@@ -88,6 +88,6 @@ func (c *Command) activate() {
 }
 
 func (c *Command) inactivate() {
-	c.SetFieldStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite).Bold(true))
+	c.SetFieldStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite).Bold(false))
 	c.SetText("")
 }

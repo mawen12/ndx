@@ -2,6 +2,7 @@ package ui
 
 import (
 	"github.com/gdamore/tcell/v2"
+	"github.com/mawen12/ndx/pkg/tviews"
 	"github.com/rivo/tview"
 )
 
@@ -19,15 +20,11 @@ type Query struct {
 
 func NewQuery(app *App) *Query {
 	q := Query{
-		InputField: tview.NewInputField(),
+		InputField: tviews.NewInputField(),
 		app:        app,
 	}
 
 	q.SetInputCapture(q.keyboard)
-
-	q.SetFocusFunc(q.activate)
-
-	q.SetBlurFunc(q.inactivate)
 
 	q.SetChangedFunc(func(text string) {
 		q.notifyListener(text)
@@ -64,23 +61,13 @@ func (q *Query) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	case tcell.KeyEsc:
 		q.app.activateTable()
 	case tcell.KeyTab:
-
 		q.app.activateEdit()
 	case tcell.KeyBacktab:
-
 		q.app.activateTable()
 	case tcell.KeyEnter:
-		q.app.model.SetPattern(q.GetText())
+		q.app.model.Pattern = q.GetText()
 		q.app.model.DoQuery()
 	}
 
 	return event
-}
-
-func (q *Query) activate() {
-	q.SetFieldStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue).Bold(true))
-}
-
-func (q *Query) inactivate() {
-	q.SetFieldStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite).Bold(true))
 }
