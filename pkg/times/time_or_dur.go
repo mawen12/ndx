@@ -73,9 +73,9 @@ func (t *TimeOrDuration) String() string {
 func formatDuration(dur time.Duration) string {
 	ret := dur.String()
 
-	if strings.HasPrefix(ret, "h0m0s") {
+	if strings.HasSuffix(ret, "h0m0s") {
 		return ret[:len(ret)-4]
-	} else if strings.HasPrefix(ret, "m0s") {
+	} else if strings.HasSuffix(ret, "m0s") {
 		return ret[:len(ret)-2]
 	}
 

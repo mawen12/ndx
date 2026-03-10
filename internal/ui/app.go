@@ -3,7 +3,6 @@ package ui
 import (
 	"sync"
 
-	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -11,30 +10,31 @@ type App struct {
 	*tview.Application
 
 	Main    *Pages
-	model   *model.QueryContext
+	Model   *ViewModel
 	views   map[string]tview.Primitive
 	running bool
 	mx      sync.RWMutex
 }
 
-func NewApp(m *model.QueryContext) *App {
+func NewApp(model *ViewModel) *App {
 	a := App{
 		Application: tview.NewApplication(),
 		Main:        NewPages(),
-		model:       m,
+		Model:       model,
 	}
 
 	a.views = map[string]tview.Primitive{
-		"topFlex":    tview.NewFlex(),
-		"queryLabel": NewQueryLabel(&a),
-		"query":      NewQuery(&a),
-		"time":       NewTime(&a),
-		"edit":       NewEdit(&a),
-		"table":      NewTable(&a),
-		"statusLine": NewStatusLine(&a),
-		"cmd":        NewCommand(&a),
-		"histogram":  NewHistogram(&a),
-		"edit_view":  NewEditView(&a),
+		"topFlex":      tview.NewFlex(),
+		"queryLabel":   NewQueryLabel(&a),
+		"query":        NewQuery(&a),
+		"time":         NewTime(&a),
+		"edit":         NewEdit(&a),
+		"table":        NewTable(&a),
+		"statusLine":   NewStatusLine(&a),
+		"cmd":          NewCommand(&a),
+		"histogram":    NewHistogram(&a),
+		"edit_view":    NewEditView(&a),
+		"message_view": NewMessageView(&a),
 	}
 
 	return &a
@@ -44,6 +44,7 @@ func (a *App) Init() {
 	a.Query().AddListener(a.QueryLabel())
 
 	a.EditView().Init()
+	a.MessageView().Init()
 
 	a.SetRoot(a.Main, true)
 }
@@ -124,6 +125,10 @@ func (a *App) Cmd() *Command {
 
 func (a *App) EditView() *EditView {
 	return a.views["edit_view"].(*EditView)
+}
+
+func (a *App) MessageView() *MessageView {
+	return a.views["message_view"].(*MessageView)
 }
 
 func (a *App) activateQuery() {

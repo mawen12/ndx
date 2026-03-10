@@ -65,8 +65,9 @@ func (q *Query) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	case tcell.KeyBacktab:
 		q.app.activateTable()
 	case tcell.KeyEnter:
-		q.app.model.Pattern = q.GetText()
-		q.app.model.DoQuery()
+		//q.app.model.Pattern = q.GetText()
+		//q.app.model.DoQuery()
+		q.app.Model.DoQuery()
 	}
 
 	return event

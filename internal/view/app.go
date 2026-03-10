@@ -11,7 +11,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal"
-	"github.com/mawen12/ndx/internal/model"
+	"github.com/mawen12/ndx/internal/config"
 	"github.com/mawen12/ndx/internal/pool"
 	"github.com/mawen12/ndx/internal/ui"
 )
@@ -20,26 +20,26 @@ type App struct {
 	*ui.App
 	Content *PageStack
 
-	model       *model.QueryContext
+	Config      *config.Query
 	pool        *pool.Pool
 	queryCancel context.CancelFunc
 }
 
-func NewApp() *App {
-	qc := model.NewQueryContext()
+func NewApp(config *config.Query) *App {
 
 	a := App{
-		App:     ui.NewApp(qc),
+		App:     ui.NewApp(&ui.ViewModel{Query: config}),
 		Content: NewPageStack(),
-		model:   qc,
+		Config:  config,
 	}
 
-	qc.QueryFunc = a.doQuery
+	a.App.Model.QueryFunc = a.doQuery
+	a.App.Model.RefreshFunc = a.refresh
 
 	return &a
 }
 
-func (a *App) Init(conns string) error {
+func (a *App) Init() error {
 	ctx := context.WithValue(context.Background(), internal.KeyApp, a)
 
 	if err := a.Content.Init(ctx); err != nil {
@@ -54,7 +54,7 @@ func (a *App) Init(conns string) error {
 
 	a.initSignals()
 
-	p, err := pool.Connect(conns)
+	p, err := pool.Connect(a.Config.Conns)
 	if err != nil {
 		return err
 	}
@@ -122,17 +122,31 @@ func (a *App) OnStat(stat pool.Stat) {
 	})
 }
 
-func (a *App) doQuery() {
-	result, err := a.pool.Query(context.Background(), *a.model)
+func (a *App) doQuery() error {
+	result, err := a.pool.Query(context.Background(), *a.Config)
 	if err != nil {
-		slog.Error("Query Failed", "queryContext", a.model, "err", err)
-		return
+		return err
 	}
 
-	a.Histogram().SetRange(int(a.model.TimeRange.ActualFrom.Unix()), int(a.model.TimeRange.ActualTo.Unix()))
+	a.Histogram().SetRange(int(a.Config.TimeRange.ActualFrom.Unix()), int(a.Config.TimeRange.ActualTo.Unix()))
 	a.Histogram().SetData(result.Stat)
 
 	a.Table().ShowLogs(result.Lines)
 
 	a.Cmd().ShowQueryDuration(result.Duration)
+
+	return nil
+}
+
+func (a *App) refresh() error {
+	a.pool.Close()
+
+	p, err := pool.Connect(a.Model.Conns)
+	if err != nil {
+		return err
+	}
+
+	a.pool = p
+
+	return nil
 }

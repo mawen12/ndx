@@ -1,83 +1,54 @@
 package config
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
-
-	"github.com/google/uuid"
-	"github.com/mawen12/ndx/internal/conn"
-	"github.com/mawen12/ndx/internal/model"
-	"github.com/mawen12/ndx/internal/proto"
 )
 
-type GetSSLPasswordFunc func(ctx context.Context) string
+func ParseConns(conns string) (QueryConns, error) {
+	parts := strings.Split(conns, ",")
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("conns(%s) is invalid", conns)
+	}
 
-type DialFunc func(ctx context.Context, config Config) (model.Connection, error)
+	var queryConns QueryConns
+	//queryConns := make([]*QueryConn, len(parts))
+	for _, part := range parts {
+		qc, err := parseConn(part)
+		if err != nil {
+			return nil, err
+		}
 
-type BuildFrontendFunc func(conn model.Connection) model.Frontend
+		queryConns = append(queryConns, qc)
+	}
 
-type Notice struct {
-	Message string
+	return queryConns, nil
 }
 
-type NoticeHandler func(model.LogClient, *Notice)
-
-type Config struct {
-	Scheme        string
-	Host          string
-	Port          uint16
-	User          string
-	Password      string
-	Command       string
-	LogFile       string
-	DialFunc      DialFunc
-	BuildFrontend BuildFrontendFunc
-	RuntimeParams map[string]string
-
-	Fallbacks            []*FallbackConfig
-	OnNotice             NoticeHandler
-	PathPrefix           string
-	CreatedByParseConfig bool
-}
-
-type FallbackConfig struct {
-	Host string
-	Port uint16
-}
-
-type ParseConfigOptions struct {
-	GetSSLPassword GetSSLPasswordFunc
-}
-
-func ParseConfig(connString string) (*Config, error) {
+func parseConn(conn string) (*QueryConn, error) {
 	defaultSettings := defaultSettings()
 
 	connStringSettings := make(map[string]string)
-	if strings.HasPrefix(connString, "cmd://") || strings.HasPrefix(connString, "ssh://") {
+	if strings.HasPrefix(conn, "cmd://") || strings.HasPrefix(conn, "ssh://") {
 		var err error
-		connStringSettings, err = parseURLSettings(connString)
+		connStringSettings, err = parseURLSettings(conn)
 		if err != nil {
-			return nil, &parseConfigError{connString: connString, msg: "failed to parse as URL", err: err}
+			return nil, &parseConfigError{conns: conn, msg: "failed to parse as URL", err: err}
 		}
 	}
 
 	settings := mergeSettings(defaultSettings, connStringSettings)
 
-	config := &Config{
-		CreatedByParseConfig: true,
-		Scheme:               settings["scheme"],
-		Host:                 settings["host"],
-		User:                 settings["user"],
-		Password:             settings["password"],
-		Command:              settings["command"],
-		LogFile:              settings["logfile"],
-		RuntimeParams:        make(map[string]string),
-		BuildFrontend:        makeDefaultBuildFrontendFunc(),
-		PathPrefix:           fmt.Sprintf("/tmp/ndx_%s", uuid.New().String()),
+	qc := QueryConn{
+		Origin:   conn,
+		Scheme:   settings["scheme"],
+		Host:     settings["host"],
+		User:     settings["user"],
+		Password: settings["password"],
+		LogFile:  settings["logfile"],
 	}
 
 	if settings["port"] != "" {
@@ -85,12 +56,10 @@ func ParseConfig(connString string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		config.Port = uint16(port)
+		qc.Port = uint16(port)
 	}
 
-	config.DialFunc = makeDialFunc(config.Scheme, config.Host)
-
-	return config, nil
+	return &qc, nil
 }
 
 func mergeSettings(settingSets ...map[string]string) map[string]string {
@@ -167,33 +136,4 @@ func parseURLSettings(connString string) (map[string]string, error) {
 
 func isIPOnly(host string) bool {
 	return net.ParseIP(strings.Trim(host, "[]")) != nil || !strings.Contains(host, ":")
-}
-
-func makeDefaultBuildFrontendFunc() BuildFrontendFunc {
-	return func(conn model.Connection) model.Frontend {
-		return proto.NewFrontend(conn)
-	}
-}
-
-func makeDialFunc(scheme string, host string) DialFunc {
-	switch scheme {
-	case "cmd":
-		return func(ctx context.Context, config Config) (model.Connection, error) {
-			return NewCmdConnConfig(ctx, config)
-		}
-	case "ssh":
-		return func(ctx context.Context, config Config) (model.Connection, error) {
-			return NewShellConnConfig(ctx, config)
-		}
-	default:
-		panic("BUG: unsupported scheme for makeDialFunc")
-	}
-}
-
-func NewCmdConnConfig(ctx context.Context, config Config) (*conn.CommandConn, error) {
-	return conn.NewCommandConn(ctx, config.Command)
-}
-
-func NewShellConnConfig(ctx context.Context, config Config) (*conn.SSHConn, error) {
-	return conn.NewSSHConn(ctx, fmt.Sprintf("%s:%d", config.Host, int(config.Port)), config.User, config.Password)
 }

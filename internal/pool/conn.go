@@ -4,29 +4,30 @@ import (
 	"context"
 	"time"
 
+	"github.com/mawen12/ndx/internal/config"
 	"github.com/mawen12/ndx/internal/logclient"
 	"github.com/mawen12/ndx/internal/model"
 )
 
 type Conn struct {
-	model.LogClient
-	connString string
-	err        error
+	*logclient.LogClient
+	Conn *config.QueryConn
+	err  error
 }
 
-func NewConn(ctx context.Context, connString string) *Conn {
-	c, err := logclient.Connect(ctx, connString)
+func NewConn(ctx context.Context, conn *config.QueryConn) *Conn {
+	c, err := logclient.Connect(ctx, conn)
 
 	return &Conn{
-		connString: connString,
-		LogClient:  c,
-		err:        err,
+		Conn:      conn,
+		LogClient: c,
+		err:       err,
 	}
 }
 
 func (c *Conn) Reconnect(ctx context.Context) {
 	if c.IsClosed() {
-		con, err := logclient.Connect(ctx, c.connString)
+		con, err := logclient.Connect(ctx, c.Conn)
 
 		c.LogClient = con
 		c.err = err

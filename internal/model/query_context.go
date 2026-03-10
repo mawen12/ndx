@@ -10,16 +10,3 @@ type QueryContext struct {
 
 	QueryFunc func()
 }
-
-func NewQueryContext() *QueryContext {
-	return &QueryContext{
-		Pattern:   "",
-		TimeRange: times.NewDefaultTimeRange(),
-	}
-}
-
-func (qc *QueryContext) DoQuery() {
-	if qc.QueryFunc != nil {
-		qc.QueryFunc()
-	}
-}

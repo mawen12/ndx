@@ -22,9 +22,9 @@ type LogClient struct {
 	conn              model.Connection
 	parameterStatuses map[string]string
 	location          *time.Location
-	frontend          model.Frontend
+	frontend          *proto.Frontend
 
-	config *config.Config
+	config *Config
 
 	status byte
 
@@ -36,16 +36,11 @@ type LogClient struct {
 	cleanupDone chan struct{}
 }
 
-func Connect(ctx context.Context, connString string) (model.LogClient, error) {
-	config, err := config.ParseConfig(connString)
-	if err != nil {
-		return nil, err
-	}
-
-	return ConnectConfig(ctx, config)
+func Connect(ctx context.Context, qc *config.QueryConn) (*LogClient, error) {
+	return ConnectConfig(ctx, NewConfig(qc))
 }
 
-func ConnectConfig(ctx context.Context, config *config.Config) (c model.LogClient, err error) {
+func ConnectConfig(ctx context.Context, config *Config) (c *LogClient, err error) {
 	if !config.CreatedByParseConfig {
 		panic("config must be created by ParseConfig")
 	}
@@ -58,7 +53,7 @@ func ConnectConfig(ctx context.Context, config *config.Config) (c model.LogClien
 	return c, nil
 }
 
-func connect(ctx context.Context, config *config.Config) (model.LogClient, error) {
+func connect(ctx context.Context, config *Config) (*LogClient, error) {
 	c := new(LogClient)
 	c.parameterStatuses = make(map[string]string)
 	c.location = time.UTC
@@ -198,7 +193,7 @@ func (c *LogClient) receiveMessage() (model.BackendMessage, error) {
 		c.parameterStatuses[msg.Name] = msg.Value
 	case *proto.NoticeResponse:
 		if c.config.OnNotice != nil {
-			c.config.OnNotice(c, &config.Notice{Message: msg.Message})
+			c.config.OnNotice(c, &Notice{Message: msg.Message})
 		}
 	case *proto.ErrorResponse:
 		panic("not implemented")

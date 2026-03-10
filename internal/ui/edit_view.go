@@ -1,9 +1,8 @@
 package ui
 
 import (
-	"container/list"
-
 	"github.com/gdamore/tcell/v2"
+	"github.com/mawen12/ndx/internal/model"
 	"github.com/mawen12/ndx/pkg/tviews"
 	"github.com/rivo/tview"
 )
@@ -23,15 +22,11 @@ Examples: "[yellow]user@myserver.com[-]", or "[yellow]user@myserver.com:22:/var/
 
 type EditView struct {
 	*tview.Grid
+	*model.CycleList
+	Model *ViewModel
 
 	frame *tview.Frame
 	flex  *tview.Flex
-
-	topFlex      *tview.Flex
-	historyLabel *tview.TextView
-	backBtn      *tview.Button
-	andLabel     *tview.TextView
-	fwdBtn       *tview.Button
 
 	timeFlex      *tview.Flex
 	timeLabel     *tview.TextView
@@ -49,21 +44,16 @@ type EditView struct {
 	selectQueryInput   *tview.InputField
 	selectQueryEditBtn *tview.Button
 
-	linkedList *list.List
-	navigator  *list.Element
-
 	app *App
 }
 
 func NewEditView(app *App) *EditView {
 	ev := EditView{
-		flex: tview.NewFlex().SetDirection(tview.FlexRow),
+		Grid:      tview.NewGrid().SetColumns(0, 105, 0).SetRows(0, 20, 0),
+		CycleList: model.NewCycleList(),
+		Model:     app.Model,
 
-		topFlex:      tview.NewFlex().SetDirection(tview.FlexColumn),
-		historyLabel: tview.NewTextView().SetText("Query History:"),
-		backBtn:      tview.NewButton("Back <Ctrl+K>"),
-		andLabel:     tview.NewTextView().SetText("and"),
-		fwdBtn:       tview.NewButton("Forth <Ctrl+J>"),
+		flex: tview.NewFlex().SetDirection(tview.FlexRow),
 
 		timeFlex:      tview.NewFlex().SetDirection(tview.FlexColumn),
 		timeLabel:     tview.NewTextView().SetText(timeLabelText).SetDynamicColors(true),
@@ -81,58 +71,32 @@ func NewEditView(app *App) *EditView {
 		selectQueryInput:   tviews.NewInputField(),
 		selectQueryEditBtn: tview.NewButton("Edit"),
 
-		linkedList: list.New(),
-		app:        app,
+		app: app,
 	}
 
 	return &ev
 }
 
 func (ev *EditView) Init() {
-	ev.navigate()
+	ev.handle()
 
 	ev.layout()
+
 }
 
-type EditViewElement struct {
-	tview.Primitive
-	Name string
-}
-
-func NewEditViewElement(p tview.Primitive, Name string) EditViewElement {
-	return EditViewElement{
-		Primitive: p,
-		Name:      Name,
-	}
-}
-
-func (ev *EditView) navigate() {
-	ev.linkedList.PushBack(NewEditViewElement(ev.timeInput, "time_input"))
-	ev.linkedList.PushBack(NewEditViewElement(ev.logStreamInput, "logStream_input"))
-	ev.linkedList.PushBack(NewEditViewElement(ev.queryInput, "query_input"))
-	ev.linkedList.PushBack(NewEditViewElement(ev.selectQueryInput, "selectQuery_input"))
-	ev.linkedList.PushBack(NewEditViewElement(ev.backBtn, "back_btn"))
-	ev.linkedList.PushBack(NewEditViewElement(ev.fwdBtn, "fwd_btn"))
-	ev.navigator = ev.linkedList.Front()
+func (ev *EditView) handle() {
+	ev.PushBack(ev.timeInput)
+	ev.PushBack(ev.logStreamInput)
+	ev.PushBack(ev.queryInput)
+	ev.PushBack(ev.selectQueryInput)
 
 	ev.timeInput.SetInputCapture(ev.keyboard)
 	ev.logStreamInput.SetInputCapture(ev.keyboard)
 	ev.queryInput.SetInputCapture(ev.keyboard)
 	ev.selectQueryInput.SetInputCapture(ev.keyboard)
-	ev.backBtn.SetInputCapture(ev.keyboard)
-	ev.fwdBtn.SetInputCapture(ev.keyboard)
 }
 
 func (ev *EditView) layout() {
-	ev.topFlex.
-		AddItem(ev.historyLabel, 15, 0, false).
-		AddItem(ev.backBtn, 15, 0, false).
-		AddItem(nil, 1, 0, false).
-		AddItem(ev.andLabel, 3, 0, false).
-		AddItem(nil, 1, 0, false).
-		AddItem(ev.fwdBtn, 16, 0, false).
-		AddItem(nil, 0, 1, false)
-
 	ev.timeFlex.
 		AddItem(ev.timeInput, 0, 1, true).
 		AddItem(nil, 1, 0, false).
@@ -144,8 +108,6 @@ func (ev *EditView) layout() {
 		AddItem(ev.selectQueryEditBtn, 6, 0, false)
 
 	ev.flex.
-		AddItem(ev.topFlex, 1, 0, false).
-		AddItem(nil, 1, 0, false).
 		AddItem(ev.timeLabel, 3, 0, false).
 		AddItem(ev.timeFlex, 1, 0, true).
 		AddItem(nil, 1, 0, false).
@@ -162,10 +124,7 @@ func (ev *EditView) layout() {
 	ev.frame.SetBorder(true).SetBorderPadding(1, 1, 1, 1)
 	ev.frame.SetTitle("Edit query params")
 
-	ev.Grid = tview.NewGrid().
-		SetColumns(0, 105, 0).
-		SetRows(0, 20, 0).
-		AddItem(ev.frame, 1, 1, 1, 1, 0, 0, true)
+	ev.Grid.AddItem(ev.frame, 1, 1, 1, 1, 0, 0, true)
 }
 
 func (ev *EditView) keyboard(event *tcell.EventKey) *tcell.EventKey {
@@ -174,18 +133,37 @@ func (ev *EditView) keyboard(event *tcell.EventKey) *tcell.EventKey {
 		ev.Hide()
 		ev.app.activateEdit()
 	case tcell.KeyTab:
-		p := ev.next()
+		p := ev.Next().(tview.Primitive)
 		ev.app.SetFocus(p)
 	case tcell.KeyBacktab:
-		p := ev.prev()
+		p := ev.Prev().(tview.Primitive)
 		ev.app.SetFocus(p)
 	case tcell.KeyEnter:
-		switch ev.current().Name {
-		case "time_input", "logStream_input", "query_input", "selectQuery_input":
+		qv := model.QueryView{
+			Conns:       ev.logStreamInput.GetText(),
+			Pattern:     ev.queryInput.GetText(),
+			TimeRange:   ev.timeInput.GetText(),
+			SelectQuery: ev.selectQueryInput.GetText(),
+		}
+		if err := ev.app.Model.Save(qv); err != nil {
 
-		case "back_btn":
+			modal := tview.NewModal().
+				SetText(err.Error()).
+				AddButtons([]string{"OK", "Cancel"}).
+				SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 
-		case "fwd_btn":
+				})
+
+			modal.SetTitle("Log query error")
+			modal.SetBackgroundColor(tcell.ColorDarkRed)
+			modal.SetBorder(true)
+			modal.SetBorderColor(tcell.ColorDarkRed)
+			modal.Box.SetBackgroundColor(tcell.ColorDarkRed)
+			modal.Box.SetBorderColor(tcell.ColorWhite)
+			modal.SetButtonStyle(tcell.Style{}.Foreground(tcell.ColorWhite).Background(tcell.ColorBlue))
+			modal.SetButtonActivatedStyle(tcell.Style{}.Foreground(tcell.ColorBlue).Background(tcell.ColorWhite))
+			ev.app.Main.AddPage("modal", modal, true, true)
+			ev.app.SetFocus(modal)
 
 		}
 	}
@@ -193,34 +171,10 @@ func (ev *EditView) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
-func (ev *EditView) current() EditViewElement {
-	return ev.navigator.Value.(EditViewElement)
-}
-
-func (ev *EditView) next() tview.Primitive {
-	if ev.navigator == ev.linkedList.Back() {
-		ev.navigator = ev.linkedList.Front()
-	} else {
-		ev.navigator = ev.navigator.Next()
-	}
-
-	return ev.navigator.Value.(EditViewElement)
-}
-
-func (ev *EditView) prev() tview.Primitive {
-	if ev.navigator == ev.linkedList.Front() {
-		ev.navigator = ev.linkedList.Back()
-	} else {
-		ev.navigator = ev.navigator.Prev()
-	}
-
-	return ev.navigator.Value.(EditViewElement)
-}
-
 func (ev *EditView) Show() {
-	ev.queryInput.SetText(ev.app.model.Pattern)
+	ev.render()
 
-	ev.navigator = ev.linkedList.Front()
+	ev.Reset()
 
 	ev.app.Main.AddPage("edit_view", ev, true, true)
 
@@ -229,4 +183,11 @@ func (ev *EditView) Show() {
 
 func (ev *EditView) Hide() {
 	ev.app.Main.RemovePage("edit_view")
+}
+
+func (ev *EditView) render() {
+	ev.timeInput.SetText(ev.Model.TimeRange.Spec())
+	ev.logStreamInput.SetText(ev.Model.Conns.String())
+	ev.queryInput.SetText(ev.Model.Pattern)
+	ev.selectQueryInput.SetText(ev.Model.SelectQuery)
 }

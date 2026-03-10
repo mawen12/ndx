@@ -10,18 +10,61 @@ import (
 	"time"
 
 	"github.com/lmittmann/tint"
+	"github.com/mawen12/ndx/internal/config"
 	"github.com/mawen12/ndx/internal/view"
+	"github.com/mawen12/ndx/pkg/times"
 )
 
 func main() {
-	conn := flag.String("conns", "", "comma separated list of ndx connection strings")
+	conns := flag.String("conns", "", "comma separated list of ndx connection strings")
 	flag.Parse()
 
-	if *conn == "" {
+	if *conns == "" {
 		slog.Error("invalid connection string")
 		os.Exit(1)
 	}
 
+	// init log
+	initLog()
+
+	defer func() {
+		if err := recover(); err != nil {
+			slog.Error("Boom! ndx init failed", "error", err)
+			slog.Error("", "stack", string(debug.Stack()))
+			fmt.Printf("%s", "Boom!\n")
+			fmt.Printf("%v.\n", err)
+		}
+	}()
+
+	// load config
+	queryConns, err := config.ParseConns(*conns)
+	if err != nil {
+		slog.Error("parse conns failed", "error", err)
+		os.Exit(1)
+	}
+
+	// build query
+	q := &config.Query{
+		Conns:     queryConns,
+		TimeRange: times.NewDefaultTimeRange(),
+	}
+
+	// new app
+	app := view.NewApp(q)
+
+	if err := app.Init(); err != nil {
+		slog.Error("app init failed", "error", err)
+		os.Exit(1)
+	}
+
+	// start app
+	if err := app.Run(); err != nil {
+		slog.Error("app run failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func initLog() {
 	log := path.Join(os.TempDir(), "ndx.log")
 	logfile, err := os.OpenFile(log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
@@ -34,29 +77,9 @@ func main() {
 			_ = logfile.Close()
 		}
 	}()
-	defer func() {
-		if err := recover(); err != nil {
-			slog.Error("Boom! ndx init failed", "error", err)
-			slog.Error("", "stack", string(debug.Stack()))
-			fmt.Printf("%s", "Boom!\n")
-			fmt.Printf("%v.\n", err)
-		}
-	}()
 
 	slog.SetDefault(slog.New(tint.NewHandler(logfile, &tint.Options{
 		Level:      slog.LevelDebug,
 		TimeFormat: time.RFC3339,
 	})))
-
-	app := view.NewApp()
-
-	if err := app.Init(*conn); err != nil {
-		slog.Error("app init failed", "error", err)
-		os.Exit(1)
-	}
-
-	if err := app.Run(); err != nil {
-		slog.Error("app run failed", "error", err)
-		os.Exit(1)
-	}
 }

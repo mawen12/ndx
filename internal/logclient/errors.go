@@ -3,12 +3,10 @@ package logclient
 import (
 	"fmt"
 	"strings"
-
-	config2 "github.com/mawen12/ndx/internal/config"
 )
 
 type connectError struct {
-	config *config2.Config
+	config *Config
 	msg    string
 	err    error
 }

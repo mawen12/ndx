@@ -111,6 +111,7 @@ func (r *TimeRange) Spec() string {
 	if r.To.IsZero() {
 		return fromStr
 	}
+
 	format := timefmt.MonthDayHourMinute
 	_, fm, fd := r.From.Time.Date()
 	_, tm, td := r.To.Time.Date()

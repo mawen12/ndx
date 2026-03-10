@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/mawen12/ndx/internal/config"
 	"github.com/mawen12/ndx/internal/model"
 )
 
@@ -19,19 +19,14 @@ type Pool struct {
 	listeners []StatListener
 }
 
-func Connect(connString string) (*Pool, error) {
-	parts := strings.Split(connString, ",")
-	if len(parts) < 1 {
-		return nil, ErrInvalidConnString
-	}
-
+func Connect(conns config.QueryConns) (*Pool, error) {
 	p := Pool{}
 
 	p.cs = make(map[string]Conn)
 	ctx := context.Background()
-	for _, part := range parts {
+	for _, part := range conns {
 		con := NewConn(ctx, part)
-		p.cs[part] = *con
+		p.cs[part.Origin] = *con
 	}
 
 	ctx, p.cancel = context.WithCancel(ctx)
@@ -107,7 +102,7 @@ func (p *Pool) Stat() (s Stat) {
 	for _, conn := range p.cs {
 		if conn.IsClosed() {
 			s.Closed++
-			s.ClosedConns[conn.connString] = conn
+			s.ClosedConns[conn.Conn.Origin] = conn
 		} else if conn.IsBusy() {
 			s.Busy++
 		} else {
@@ -129,7 +124,7 @@ type execResult struct {
 	Result     model.QueryResult
 }
 
-func (p *Pool) Query(ctx context.Context, qc model.QueryContext) (MergedResult, error) {
+func (p *Pool) Query(ctx context.Context, qc config.Query) (MergedResult, error) {
 	start := time.Now()
 	resultCh := make(chan execResult)
 	var wg sync.WaitGroup
