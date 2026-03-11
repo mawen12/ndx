@@ -26,7 +26,7 @@ func NewTime(app *App) *Time {
 }
 
 func (t *Time) AddListener(l TimeListener) {
-	t.listeners = append(t.listeners)
+	t.listeners = append(t.listeners, l)
 }
 
 func (t *Time) RemoveListener(l TimeListener) {
@@ -38,8 +38,8 @@ func (t *Time) RemoveListener(l TimeListener) {
 	}
 }
 
-func (t *Time) SetTextAndNotify(timeStr string) {
-	t.SetText(timeStr)
+func (t *Time) SetText(timeStr string) {
+	t.TextView.SetText(timeStr)
 
 	for _, l := range t.listeners {
 		l.SetTimeText(timeStr)

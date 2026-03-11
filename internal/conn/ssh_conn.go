@@ -80,7 +80,8 @@ func (s *SSHConn) Close() error {
 		return &connInvalidErr{}
 	}
 
-	return s.session.Close()
+	s.session.Close()
+	return s.client.Close()
 }
 
 func (s *SSHConn) ok() bool {

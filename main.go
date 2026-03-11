@@ -25,10 +25,32 @@ func main() {
 	}
 
 	// init log
-	initLog()
+	log := path.Join(os.TempDir(), "ndx.log")
+	logfile, err := os.OpenFile(log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		slog.Error("log file init failed", "log", log, "err", err)
+		os.Exit(1)
+	}
+
+	defer func() {
+		if logfile != nil {
+			_ = logfile.Close()
+		}
+	}()
+
+	slog.SetDefault(slog.New(tint.NewHandler(logfile, &tint.Options{
+		Level:      slog.LevelDebug,
+		TimeFormat: time.RFC3339,
+	})))
+
+	var app *view.App
 
 	defer func() {
 		if err := recover(); err != nil {
+			if app != nil {
+				app.Close()
+			}
+
 			slog.Error("Boom! ndx init failed", "error", err)
 			slog.Error("", "stack", string(debug.Stack()))
 			fmt.Printf("%s", "Boom!\n")
@@ -50,7 +72,7 @@ func main() {
 	}
 
 	// new app
-	app := view.NewApp(q)
+	app = view.NewApp(q)
 
 	if err := app.Init(); err != nil {
 		slog.Error("app init failed", "error", err)
@@ -62,24 +84,4 @@ func main() {
 		slog.Error("app run failed", "error", err)
 		os.Exit(1)
 	}
-}
-
-func initLog() {
-	log := path.Join(os.TempDir(), "ndx.log")
-	logfile, err := os.OpenFile(log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		slog.Error("log file init failed", "log", log, "err", err)
-		os.Exit(1)
-	}
-
-	defer func() {
-		if logfile != nil {
-			_ = logfile.Close()
-		}
-	}()
-
-	slog.SetDefault(slog.New(tint.NewHandler(logfile, &tint.Options{
-		Level:      slog.LevelDebug,
-		TimeFormat: time.RFC3339,
-	})))
 }

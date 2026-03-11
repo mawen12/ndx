@@ -53,8 +53,23 @@ type QueryConns []*QueryConn
 
 func (qcs QueryConns) String() string {
 	var sb strings.Builder
-	for _, queryConn := range qcs {
+	for i, queryConn := range qcs {
 		sb.WriteString(queryConn.String())
+		if i != len(qcs)-1 {
+			sb.WriteByte(',')
+		}
+	}
+	return sb.String()
+}
+
+func (qcs QueryConns) Pretty() string {
+	var sb strings.Builder
+	for i, queryConn := range qcs {
+		sb.WriteString(queryConn.String())
+		if i != len(qcs)-1 {
+			sb.WriteByte(',')
+			sb.WriteByte('\n')
+		}
 	}
 	return sb.String()
 }

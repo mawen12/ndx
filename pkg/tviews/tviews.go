@@ -38,3 +38,20 @@ func NewInputField() *tview.InputField {
 
 	return input
 }
+
+func NewTextArea() *tview.TextArea {
+	area := tview.NewTextArea()
+
+	area.SetTextStyle(InactiveStyle)
+	area.SetWordWrap(true)
+
+	area.SetFocusFunc(func() {
+		area.SetTextStyle(ActiveStyle)
+	})
+
+	area.SetBlurFunc(func() {
+		area.SetTextStyle(InactiveStyle)
+	})
+
+	return area
+}

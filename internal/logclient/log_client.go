@@ -3,6 +3,7 @@ package logclient
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/mawen12/ndx/internal/config"
@@ -36,16 +37,16 @@ type LogClient struct {
 	cleanupDone chan struct{}
 }
 
-func Connect(ctx context.Context, qc *config.QueryConn) (*LogClient, error) {
-	return ConnectConfig(ctx, NewConfig(qc))
+func Connect(ctx context.Context, qc *config.QueryConn, callback func(string, bool)) (*LogClient, error) {
+	return ConnectConfig(ctx, NewConfig(qc), callback)
 }
 
-func ConnectConfig(ctx context.Context, config *Config) (c *LogClient, err error) {
+func ConnectConfig(ctx context.Context, config *Config, callback func(string, bool)) (c *LogClient, err error) {
 	if !config.CreatedByParseConfig {
 		panic("config must be created by ParseConfig")
 	}
 
-	c, err = connect(ctx, config)
+	c, err = connect(ctx, config, callback)
 	if err != nil {
 		return nil, &connectError{config: config, msg: "server error", err: err}
 	}
@@ -53,7 +54,7 @@ func ConnectConfig(ctx context.Context, config *Config) (c *LogClient, err error
 	return c, nil
 }
 
-func connect(ctx context.Context, config *Config) (*LogClient, error) {
+func connect(ctx context.Context, config *Config, callback func(string, bool)) (*LogClient, error) {
 	c := new(LogClient)
 	c.parameterStatuses = make(map[string]string)
 	c.location = time.UTC
@@ -99,13 +100,18 @@ func connect(ctx context.Context, config *Config) (*LogClient, error) {
 			if msg.Name == "tz" {
 				location, err := time.LoadLocation(msg.Value)
 				if err != nil {
-					panic("not implemented")
+					if callback != nil {
+						callback(err.Error(), false)
+					}
+					slog.Error("connect receive ParameterStatus message, can not parse tz", "error", err, "msg", msg.Value)
 				} else {
 					c.location = location
 				}
 			}
 		case *proto.NoticeResponse:
-			// handle by receiveMessage
+			if callback != nil {
+				callback(msg.Message, false)
+			}
 		default:
 			c.conn.Close()
 			return nil, &connectError{config: config, msg: "received unexpected message", err: err}
@@ -170,12 +176,12 @@ func (c *LogClient) ReceiveMessage(ctx context.Context) (model.BackendMessage, e
 	defer c.unlock()
 
 	if ctx != context.Background() {
-		panic("not implemented")
+		panic("log client receive message cancel not implemented")
 	}
 
 	msg, err := c.receiveMessage()
 	if err != nil {
-		panic("not implemented")
+		panic("log client receive message error not implemented")
 	}
 	return msg, err
 }
@@ -183,7 +189,7 @@ func (c *LogClient) ReceiveMessage(ctx context.Context) (model.BackendMessage, e
 func (c *LogClient) receiveMessage() (model.BackendMessage, error) {
 	msg, err := c.peekMessage()
 	if err != nil {
-		panic("not implemented")
+		panic("log client peek message error not implemented")
 	}
 
 	c.peekedMsg = nil
@@ -196,10 +202,10 @@ func (c *LogClient) receiveMessage() (model.BackendMessage, error) {
 			c.config.OnNotice(c, &Notice{Message: msg.Message})
 		}
 	case *proto.ErrorResponse:
-		panic("not implemented")
+		return nil, errors.New(msg.Message)
 	}
 
-	return msg, err
+	return msg, nil
 }
 
 func (c *LogClient) peekMessage() (model.BackendMessage, error) {
@@ -210,7 +216,7 @@ func (c *LogClient) peekMessage() (model.BackendMessage, error) {
 	msg, err := c.frontend.Receive()
 
 	if err != nil {
-		panic("not implemented")
+		panic("log client peek message then error not implemented")
 	}
 
 	c.peekedMsg = msg

@@ -13,27 +13,51 @@ import (
 )
 
 type Pool struct {
-	cs map[string]Conn
+	cs map[string]*Conn
 
+	connected bool
 	cancel    context.CancelFunc
 	listeners []StatListener
 }
 
-func Connect(conns config.QueryConns) (*Pool, error) {
+func NewPool(conns config.QueryConns) *Pool {
 	p := Pool{}
 
-	p.cs = make(map[string]Conn)
-	ctx := context.Background()
+	p.cs = make(map[string]*Conn)
 	for _, part := range conns {
-		con := NewConn(ctx, part)
-		p.cs[part.Origin] = *con
+		p.cs[part.Origin] = NewConn(part)
 	}
 
-	ctx, p.cancel = context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	p.cancel = cancel
 
 	go p.run(ctx)
 
-	return &p, nil
+	return &p
+}
+
+func (p *Pool) Connect(ctx context.Context, callback func(string, string, bool)) error {
+	for _, conn := range p.cs {
+		cb := func(message string, finished bool) {
+			callback(conn.Conn.Origin, message, finished)
+		}
+
+		err := conn.Connect(ctx, cb)
+		if err != nil {
+			cb(err.Error(), true)
+			return err
+		}
+
+		cb("", true)
+	}
+
+	p.connected = true
+
+	return nil
+}
+
+func (p *Pool) IsConnected() bool {
+	return p.connected
 }
 
 func (p *Pool) run(ctx context.Context) {
@@ -46,15 +70,15 @@ func (p *Pool) run(ctx context.Context) {
 			p.notifyListeners(s)
 			slog.Info("checking connections status", "stat", s)
 			if s.Closed != 0 {
-				for connString, c := range s.ClosedConns {
-					slog.Info("reconnecting", "connString", connString)
+				//for connString, c := range s.ClosedConns {
+				//	slog.Info("reconnecting", "connString", connString)
 
-					if c.err != nil {
-						slog.Error("failed to reconnect", "connString", connString, "err", c.err)
-					} else {
-						slog.Info("reconnected", "connString", connString, "err", c.err)
-					}
-				}
+				//if c.err != nil {
+				//	slog.Error("failed to reconnect", "connString", connString, "err", c.err)
+				//} else {
+				//	slog.Info("reconnected", "connString", connString, "err", c.err)
+				//}
+				//}
 			}
 		case <-ctx.Done():
 			return
@@ -67,7 +91,7 @@ type Stat struct {
 	Busy   int
 	Closed int
 
-	ClosedConns map[string]Conn
+	ClosedConns map[string]*Conn
 }
 
 type StatListener interface {
@@ -98,25 +122,35 @@ func (s Stat) String() string {
 }
 
 func (p *Pool) Stat() (s Stat) {
-	s.ClosedConns = make(map[string]Conn)
+	s.ClosedConns = make(map[string]*Conn)
 	for _, conn := range p.cs {
-		if conn.IsClosed() {
-			s.Closed++
-			s.ClosedConns[conn.Conn.Origin] = conn
-		} else if conn.IsBusy() {
-			s.Busy++
-		} else {
-			s.Idle++
+		if conn.LogClient != nil {
+			if conn.IsClosed() {
+				s.Closed++
+				s.ClosedConns[conn.Conn.Origin] = conn
+			} else if conn.IsBusy() {
+				s.Busy++
+			} else {
+				s.Idle++
+			}
 		}
+
 	}
 	return
 }
 
 func (p *Pool) Close() {
+	if !p.connected {
+		return
+	}
+
 	p.cancel()
 	for _, c := range p.cs {
-		_ = c.Close()
+		if c.LogClient != nil {
+			_ = c.Close()
+		}
 	}
+	p.connected = false
 }
 
 type execResult struct {

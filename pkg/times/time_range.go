@@ -131,7 +131,7 @@ func (r *TimeRange) String() string {
 	} else if r.From.IsAbsolute() {
 		return fmt.Sprintf("%s to now (%s)", r.From.Format("Jan2 15:04"), formatDuration(rangeDuration))
 	} else {
-		return fmt.Sprintf("last %s", TimeOrDuration{Duration: -r.From.Duration})
+		return fmt.Sprintf("last %s", formatDuration(rangeDuration))
 	}
 }
 

@@ -1,6 +1,8 @@
 package view
 
 import (
+	"context"
+
 	"github.com/rivo/tview"
 )
 
@@ -39,4 +41,22 @@ func NewMainPage(app *App) *MainPage {
 
 func (mp *MainPage) SetTimeText(timeStr string) {
 	mp.Top.ResizeItem(mp.app.Time(), len(timeStr), 0)
+}
+
+func (mp *MainPage) Name() string {
+	return "main"
+}
+
+func (mp *MainPage) Init(ctx context.Context) error {
+
+	return nil
+}
+
+func (mp *MainPage) Start() {
+	mp.app.Query().SetText(mp.app.Model.Pattern)
+	mp.app.Time().SetText(mp.app.Model.TimeRange.String())
+}
+
+func (mp *MainPage) Stop() {
+
 }

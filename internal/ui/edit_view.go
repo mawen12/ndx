@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"context"
+	"log/slog"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal/model"
 	"github.com/mawen12/ndx/pkg/tviews"
@@ -34,7 +37,7 @@ type EditView struct {
 	timezoneLabel *tview.TextView
 
 	logStreamLabel *tview.TextView
-	logStreamInput *tview.InputField
+	logStreamInput *tview.TextArea
 
 	queryLabel *tview.TextView
 	queryInput *tview.InputField
@@ -44,12 +47,15 @@ type EditView struct {
 	selectQueryInput   *tview.InputField
 	selectQueryEditBtn *tview.Button
 
+	btnFlex          *tview.Flex
+	okBtn, cancelBtn *tview.Button
+
 	app *App
 }
 
 func NewEditView(app *App) *EditView {
 	ev := EditView{
-		Grid:      tview.NewGrid().SetColumns(0, 105, 0).SetRows(0, 20, 0),
+		Grid:      tview.NewGrid().SetColumns(0, 105, 0).SetRows(0, 23, 0),
 		CycleList: model.NewCycleList(),
 		Model:     app.Model,
 
@@ -61,7 +67,7 @@ func NewEditView(app *App) *EditView {
 		timezoneLabel: tview.NewTextView(),
 
 		logStreamLabel: tview.NewTextView().SetText(logStreamLabelText).SetDynamicColors(true),
-		logStreamInput: tviews.NewInputField(),
+		logStreamInput: tviews.NewTextArea().SetSize(0, 0),
 
 		queryLabel: tview.NewTextView().SetText(queryLabelText).SetDynamicColors(true),
 		queryInput: tviews.NewInputField(),
@@ -71,29 +77,50 @@ func NewEditView(app *App) *EditView {
 		selectQueryInput:   tviews.NewInputField(),
 		selectQueryEditBtn: tview.NewButton("Edit"),
 
+		btnFlex:   tview.NewFlex().SetDirection(tview.FlexColumn),
+		okBtn:     tview.NewButton("OK"),
+		cancelBtn: tview.NewButton("Cancel"),
+
 		app: app,
 	}
 
 	return &ev
 }
 
-func (ev *EditView) Init() {
+func (ev *EditView) Name() string {
+	return "edit_view"
+}
+
+func (ev *EditView) Init(ctx context.Context) error {
 	ev.handle()
 
 	ev.layout()
 
+	return nil
+}
+
+func (ev *EditView) Start() {
+	ev.Reset()
+}
+
+func (ev *EditView) Stop() {
+	slog.Info("stop edit view")
 }
 
 func (ev *EditView) handle() {
-	ev.PushBack(ev.timeInput)
-	ev.PushBack(ev.logStreamInput)
-	ev.PushBack(ev.queryInput)
-	ev.PushBack(ev.selectQueryInput)
+	ev.PushBack(model.NewCyclePrimitive(ev.timeInput, "timeInput"))
+	ev.PushBack(model.NewCyclePrimitive(ev.logStreamInput, "logsreamInput"))
+	ev.PushBack(model.NewCyclePrimitive(ev.queryInput, "queryInput"))
+	ev.PushBack(model.NewCyclePrimitive(ev.selectQueryInput, "selectQueryInput"))
+	ev.PushBack(model.NewCyclePrimitive(ev.okBtn, "ok"))
+	ev.PushBack(model.NewCyclePrimitive(ev.cancelBtn, "cancel"))
 
 	ev.timeInput.SetInputCapture(ev.keyboard)
 	ev.logStreamInput.SetInputCapture(ev.keyboard)
 	ev.queryInput.SetInputCapture(ev.keyboard)
 	ev.selectQueryInput.SetInputCapture(ev.keyboard)
+	ev.okBtn.SetInputCapture(ev.keyboard)
+	ev.cancelBtn.SetInputCapture(ev.keyboard)
 }
 
 func (ev *EditView) layout() {
@@ -107,18 +134,27 @@ func (ev *EditView) layout() {
 		AddItem(nil, 1, 0, false).
 		AddItem(ev.selectQueryEditBtn, 6, 0, false)
 
+	ev.btnFlex.
+		AddItem(nil, 0, 1, false).
+		AddItem(ev.okBtn, 10, 0, false).
+		AddItem(nil, 0, 1, false).
+		AddItem(ev.cancelBtn, 10, 0, false).
+		AddItem(nil, 0, 1, false)
+
 	ev.flex.
 		AddItem(ev.timeLabel, 3, 0, false).
 		AddItem(ev.timeFlex, 1, 0, true).
 		AddItem(nil, 1, 0, false).
 		AddItem(ev.logStreamLabel, 2, 0, false).
-		AddItem(ev.logStreamInput, 1, 1, false).
+		AddItem(ev.logStreamInput, 0, 1, false).
 		AddItem(nil, 1, 0, false).
 		AddItem(ev.queryLabel, 1, 0, false).
 		AddItem(ev.queryInput, 1, 0, false).
 		AddItem(nil, 1, 0, false).
 		AddItem(ev.selectQueryLabel, 1, 0, false).
-		AddItem(ev.selectQueryFlex, 1, 0, false)
+		AddItem(ev.selectQueryFlex, 1, 0, false).
+		AddItem(nil, 1, 0, false).
+		AddItem(ev.btnFlex, 1, 0, false)
 
 	ev.frame = tview.NewFrame(ev.flex).SetBorders(0, 0, 0, 0, 0, 0)
 	ev.frame.SetBorder(true).SetBorderPadding(1, 1, 1, 1)
@@ -132,62 +168,56 @@ func (ev *EditView) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	case tcell.KeyEsc:
 		ev.Hide()
 		ev.app.activateEdit()
+		return nil
 	case tcell.KeyTab:
 		p := ev.Next().(tview.Primitive)
 		ev.app.SetFocus(p)
+		return nil
 	case tcell.KeyBacktab:
 		p := ev.Prev().(tview.Primitive)
 		ev.app.SetFocus(p)
+		return nil
 	case tcell.KeyEnter:
-		qv := model.QueryView{
-			Conns:       ev.logStreamInput.GetText(),
-			Pattern:     ev.queryInput.GetText(),
-			TimeRange:   ev.timeInput.GetText(),
-			SelectQuery: ev.selectQueryInput.GetText(),
-		}
-		if err := ev.app.Model.Save(qv); err != nil {
-
-			modal := tview.NewModal().
-				SetText(err.Error()).
-				AddButtons([]string{"OK", "Cancel"}).
-				SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-
+		switch ev.Current().(model.CyclePrimitive).Name {
+		case "ok":
+			qv := model.QueryView{
+				Conns:       ev.logStreamInput.GetText(),
+				Pattern:     ev.queryInput.GetText(),
+				TimeRange:   ev.timeInput.GetText(),
+				SelectQuery: ev.selectQueryInput.GetText(),
+			}
+			if err := ev.app.Model.Save(qv); err != nil {
+				ev.app.MessageDialog().ShowError(Message{
+					Title:   "Log query error",
+					Message: err.Error(),
+					IsErr:   true,
 				})
-
-			modal.SetTitle("Log query error")
-			modal.SetBackgroundColor(tcell.ColorDarkRed)
-			modal.SetBorder(true)
-			modal.SetBorderColor(tcell.ColorDarkRed)
-			modal.Box.SetBackgroundColor(tcell.ColorDarkRed)
-			modal.Box.SetBorderColor(tcell.ColorWhite)
-			modal.SetButtonStyle(tcell.Style{}.Foreground(tcell.ColorWhite).Background(tcell.ColorBlue))
-			modal.SetButtonActivatedStyle(tcell.Style{}.Foreground(tcell.ColorBlue).Background(tcell.ColorWhite))
-			ev.app.Main.AddPage("modal", modal, true, true)
-			ev.app.SetFocus(modal)
-
+				return nil
+			}
+			ev.app.Main.Pop()
+			return nil
+		case "cancel":
+			ev.Hide()
+			ev.app.activateEdit()
+			return nil
 		}
 	}
-
 	return event
 }
 
 func (ev *EditView) Show() {
 	ev.render()
 
-	ev.Reset()
-
-	ev.app.Main.AddPage("edit_view", ev, true, true)
-
-	ev.app.SetFocus(ev.frame)
+	ev.app.Main.Push(ev)
 }
 
 func (ev *EditView) Hide() {
-	ev.app.Main.RemovePage("edit_view")
+	ev.app.Main.Pop()
 }
 
 func (ev *EditView) render() {
 	ev.timeInput.SetText(ev.Model.TimeRange.Spec())
-	ev.logStreamInput.SetText(ev.Model.Conns.String())
+	ev.logStreamInput.SetText(ev.Model.Conns.Pretty(), false)
 	ev.queryInput.SetText(ev.Model.Pattern)
 	ev.selectQueryInput.SetText(ev.Model.SelectQuery)
 }

@@ -17,6 +17,7 @@ func ParseConns(conns string) (QueryConns, error) {
 	var queryConns QueryConns
 	//queryConns := make([]*QueryConn, len(parts))
 	for _, part := range parts {
+		part = strings.TrimSpace(strings.ReplaceAll(part, "\r\n", ""))
 		qc, err := parseConn(part)
 		if err != nil {
 			return nil, err

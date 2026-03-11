@@ -9,35 +9,32 @@ import (
 	"github.com/mawen12/ndx/internal/model"
 )
 
+type Notice struct {
+	Message string
+	Err     error
+}
+
 type Conn struct {
 	*logclient.LogClient
 	Conn *config.QueryConn
-	err  error
 }
 
-func NewConn(ctx context.Context, conn *config.QueryConn) *Conn {
-	c, err := logclient.Connect(ctx, conn)
-
+func NewConn(conn *config.QueryConn) *Conn {
 	return &Conn{
-		Conn:      conn,
-		LogClient: c,
-		err:       err,
+		Conn: conn,
 	}
 }
 
-func (c *Conn) Reconnect(ctx context.Context) {
-	if c.IsClosed() {
-		con, err := logclient.Connect(ctx, c.Conn)
-
-		c.LogClient = con
-		c.err = err
+func (c *Conn) Connect(ctx context.Context, callback func(string, bool)) error {
+	client, err := logclient.Connect(ctx, c.Conn, callback)
+	if err != nil {
+		return err
 	}
+
+	c.LogClient = client
+	return nil
 }
 
 func (c *Conn) Exec(ctx context.Context, pattern string, from, to time.Time) model.QueryResult {
-	//if c.IsClosed() {
-	//	return &logclient.QueryResult{err: c.err}
-	//}
-
 	return c.LogClient.Execute(ctx, pattern, from, to).Read()
 }

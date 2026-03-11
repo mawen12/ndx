@@ -86,7 +86,7 @@ func (h *Histogram) keyboard(event *tcell.EventKey) *tcell.EventKey {
 }
 
 func (h *Histogram) selected(from, to int) {
-	panic("not implemented")
+	panic("histogram selected not implemented")
 }
 
 const (

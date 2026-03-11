@@ -11,9 +11,10 @@ import (
 type CommandConn struct {
 	cmd *exec.Cmd
 
-	stdin io.WriteCloser
+	stdin          io.WriteCloser
+	stdout, stderr io.ReadCloser
 
-	stdout, stderr *bufio.Reader
+	stdoutBuf, stderrBuf *bufio.Reader
 }
 
 func NewCommandConn(ctx context.Context, command string, arg ...string) (*CommandConn, error) {
@@ -44,7 +45,7 @@ func NewCommandConn(ctx context.Context, command string, arg ...string) (*Comman
 	stdoutBuf := bufio.NewReader(stdout)
 	stderrBuf := bufio.NewReader(stderr)
 
-	return &CommandConn{cmd: cmd, stdin: stdin, stdout: stdoutBuf, stderr: stderrBuf}, nil
+	return &CommandConn{cmd: cmd, stdin: stdin, stdout: stdout, stderr: stderr, stdoutBuf: stdoutBuf, stderrBuf: stderrBuf}, nil
 }
 
 func (c *CommandConn) Readout() (line string, err error) {
@@ -52,7 +53,7 @@ func (c *CommandConn) Readout() (line string, err error) {
 		return "", &connInvalidErr{}
 	}
 
-	line, err = c.stdout.ReadString('\n')
+	line, err = c.stdoutBuf.ReadString('\n')
 	return strings.TrimRight(line, "\r\n"), err
 }
 
@@ -64,7 +65,9 @@ func (c *CommandConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *CommandConn) Close() error {
-	c.stdin.Close()
+	_ = c.stdin.Close()
+	_ = c.stdout.Close()
+	_ = c.stderr.Close()
 	return c.cmd.Wait()
 }
 

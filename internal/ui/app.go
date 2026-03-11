@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"sync"
 
 	"github.com/rivo/tview"
@@ -24,27 +25,30 @@ func NewApp(model *ViewModel) *App {
 	}
 
 	a.views = map[string]tview.Primitive{
-		"topFlex":      tview.NewFlex(),
-		"queryLabel":   NewQueryLabel(&a),
-		"query":        NewQuery(&a),
-		"time":         NewTime(&a),
-		"edit":         NewEdit(&a),
-		"table":        NewTable(&a),
-		"statusLine":   NewStatusLine(&a),
-		"cmd":          NewCommand(&a),
-		"histogram":    NewHistogram(&a),
-		"edit_view":    NewEditView(&a),
-		"message_view": NewMessageView(&a),
+		"topFlex":         tview.NewFlex(),
+		"queryLabel":      NewQueryLabel(&a),
+		"query":           NewQuery(&a),
+		"time":            NewTime(&a),
+		"edit":            NewEdit(&a),
+		"table":           NewTable(&a),
+		"statusLine":      NewStatusLine(&a),
+		"cmd":             NewCommand(&a),
+		"histogram":       NewHistogram(&a),
+		"edit_view":       NewEditView(&a),
+		"message_view":    NewMessageView(&a),
+		"message_dialog":  NewMessageDialog(&a),
+		"message_connect": NewMessageConnect(&a),
 	}
 
 	return &a
 }
 
-func (a *App) Init() {
+func (a *App) Init(ctx context.Context) {
 	a.Query().AddListener(a.QueryLabel())
 
-	a.EditView().Init()
+	a.EditView().Init(ctx)
 	a.MessageView().Init()
+	a.MessageDialog().Init(ctx)
 
 	a.SetRoot(a.Main, true)
 }
@@ -129,6 +133,14 @@ func (a *App) EditView() *EditView {
 
 func (a *App) MessageView() *MessageView {
 	return a.views["message_view"].(*MessageView)
+}
+
+func (a *App) MessageDialog() *MessageDialog {
+	return a.views["message_dialog"].(*MessageDialog)
+}
+
+func (a *App) MessageConnect() *MessageConnect {
+	return a.views["message_connect"].(*MessageConnect)
 }
 
 func (a *App) activateQuery() {

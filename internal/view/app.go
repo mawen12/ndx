@@ -12,13 +12,13 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal"
 	"github.com/mawen12/ndx/internal/config"
+	"github.com/mawen12/ndx/internal/model"
 	"github.com/mawen12/ndx/internal/pool"
 	"github.com/mawen12/ndx/internal/ui"
 )
 
 type App struct {
 	*ui.App
-	Content *PageStack
 
 	Config      *config.Query
 	pool        *pool.Pool
@@ -28,11 +28,11 @@ type App struct {
 func NewApp(config *config.Query) *App {
 
 	a := App{
-		App:     ui.NewApp(&ui.ViewModel{Query: config}),
-		Content: NewPageStack(),
-		Config:  config,
+		App:    ui.NewApp(&ui.ViewModel{Query: config}),
+		Config: config,
 	}
 
+	a.App.Model.IsConnectFunc = a.pool.IsConnected
 	a.App.Model.QueryFunc = a.doQuery
 	a.App.Model.RefreshFunc = a.refresh
 
@@ -42,11 +42,7 @@ func NewApp(config *config.Query) *App {
 func (a *App) Init() error {
 	ctx := context.WithValue(context.Background(), internal.KeyApp, a)
 
-	if err := a.Content.Init(ctx); err != nil {
-		return err
-	}
-
-	a.App.Init()
+	a.App.Init(ctx)
 
 	a.SetInputCapture(a.keyboard)
 
@@ -54,24 +50,17 @@ func (a *App) Init() error {
 
 	a.initSignals()
 
-	p, err := pool.Connect(a.Config.Conns)
-	if err != nil {
-		return err
-	}
+	a.Main.AddListener(a)
 
-	p.AddListener(a)
+	a.pool = pool.NewPool(a.Config.Conns)
 
-	a.pool = p
+	a.pool.AddListener(a)
 
 	return nil
 }
 
 func (a *App) Run() error {
-	go func() {
-		a.QueueUpdateDraw(func() {
-			a.Main.SwitchToPage("main")
-		})
-	}()
+	go a.refresh()
 
 	a.SetRunning(true)
 	slog.Info("App is running")
@@ -79,6 +68,12 @@ func (a *App) Run() error {
 	if err := a.Application.Run(); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (a *App) Close() error {
+	a.pool.Close()
 
 	return nil
 }
@@ -92,9 +87,10 @@ func (a *App) keyboard(event *tcell.EventKey) *tcell.EventKey {
 }
 
 func (a *App) layout(ctx context.Context) {
-	main := NewMainPage(a)
+	//main := NewMainPage(a)
 
-	a.Main.AddPage("main", main, true, false)
+	//a.Main.AddPage("main", main, true, true)
+	a.Main.Push(NewMainPage(a))
 }
 
 func (a *App) initSignals() {
@@ -139,14 +135,39 @@ func (a *App) doQuery() error {
 }
 
 func (a *App) refresh() error {
-	a.pool.Close()
+	ctx, cancel := context.WithCancel(context.Background())
 
-	p, err := pool.Connect(a.Model.Conns)
-	if err != nil {
-		return err
+	noticeCh := make(chan model.Notice, 10)
+
+	callback := func(conn, message string, finished bool) {
+		noticeCh <- model.Notice{Conn: conn, Message: message, Finished: finished}
 	}
 
-	a.pool = p
+	a.MessageConnect().ShowError(noticeCh, cancel)
 
+	err := a.pool.Connect(ctx, callback)
+	if err != nil {
+		slog.Error("connect failed", "error", err)
+	}
+
+	close(noticeCh)
 	return nil
+}
+
+func (a *App) StackPushed(c model.Component) {
+	c.Start()
+	a.SetFocus(c)
+}
+
+func (a *App) StackPopped(old, new model.Component) {
+	old.Stop()
+	a.StackTop(new)
+}
+
+func (a *App) StackTop(top model.Component) {
+	if top == nil {
+		return
+	}
+	top.Start()
+	a.SetFocus(top)
 }

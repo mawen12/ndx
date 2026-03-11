@@ -41,7 +41,8 @@ func (p *Pages) delete(c model.Component) {
 }
 
 func (p *Pages) StackPushed(c model.Component) {
-	p.addAndShow(c)
+	//p.addAndShow(c)
+	p.add(c)
 }
 
 func (p *Pages) StackPopped(old, _ model.Component) {
