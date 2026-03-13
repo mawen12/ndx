@@ -7,11 +7,12 @@ import (
 	"os"
 	"path"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/lmittmann/tint"
 	"github.com/mawen12/ndx/internal/config"
-	"github.com/mawen12/ndx/internal/view"
+	"github.com/mawen12/ndx/internal/viewv2"
 	"github.com/mawen12/ndx/pkg/times"
 )
 
@@ -43,8 +44,7 @@ func main() {
 		TimeFormat: time.RFC3339,
 	})))
 
-	var app *view.App
-
+	var app *viewv2.App
 	defer func() {
 		if err := recover(); err != nil {
 			if app != nil {
@@ -52,32 +52,29 @@ func main() {
 			}
 
 			slog.Error("Boom! ndx init failed", "error", err)
-			slog.Error("", "stack", string(debug.Stack()))
+			stack := string(debug.Stack())
+			lines := strings.Split(stack, "\n")
+			for _, line := range lines {
+				slog.Error("", "stack", line)
+			}
 			fmt.Printf("%s", "Boom!\n")
 			fmt.Printf("%v.\n", err)
 		}
 	}()
 
-	// load config
-	queryConns, err := config.ParseConns(*conns)
-	if err != nil {
-		slog.Error("parse conns failed", "error", err)
-		os.Exit(1)
-	}
-
 	// build query
 	q := &config.Query{
-		Conns:     queryConns,
+		Origin:    *conns,
 		TimeRange: times.NewDefaultTimeRange(),
 	}
 
 	// new app
-	app = view.NewApp(q)
+	app = viewv2.NewApp(q)
 
-	if err := app.Init(); err != nil {
-		slog.Error("app init failed", "error", err)
-		os.Exit(1)
-	}
+	//if err := app.Init(); err != nil {
+	//	slog.Error("app init failed", "error", err)
+	//	os.Exit(1)
+	//}
 
 	// start app
 	if err := app.Run(); err != nil {

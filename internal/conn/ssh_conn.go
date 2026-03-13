@@ -3,8 +3,11 @@ package conn
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
+	"log/slog"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -19,16 +22,45 @@ type SSHConn struct {
 }
 
 func NewSSHConn(ctx context.Context, address, user, password string) (*SSHConn, error) {
-	c, err := ssh.Dial("tcp", address, &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	})
-	if err != nil {
-		return nil, err
+	type dialRet struct {
+		c   *ssh.Client
+		err error
 	}
+
+	retChan := make(chan dialRet, 1)
+	go func() {
+		c, err := ssh.Dial("tcp", address, &ssh.ClientConfig{
+			User: user,
+			Auth: []ssh.AuthMethod{
+				ssh.Password(password),
+			},
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			Timeout:         10 * time.Second,
+		})
+
+		retChan <- dialRet{c: c, err: err}
+	}()
+
+	var c *ssh.Client
+	select {
+	case <-ctx.Done():
+		slog.Error("ssh connection cancel")
+		return nil, errors.New("SSH connection cancel")
+	case ret := <-retChan:
+		if ret.err != nil {
+			slog.Error("ssh connection error", "error", ret.err)
+			return nil, ret.err
+		}
+		c = ret.c
+	}
+
+	//c, err := ssh.Dial("tcp", address, &ssh.ClientConfig{
+	//	User: user,
+	//	Auth: []ssh.AuthMethod{
+	//		ssh.Password(password),
+	//	},
+	//	HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	//})
 
 	s, err := c.NewSession()
 	if err != nil {

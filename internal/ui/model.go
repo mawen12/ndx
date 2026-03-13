@@ -12,8 +12,6 @@ import (
 type ViewModel struct {
 	*config.Query
 
-	IsConnectFunc func() bool
-
 	QueryFunc func() error
 
 	RefreshFunc func() error
@@ -27,16 +25,19 @@ func (vm *ViewModel) Refresh() error {
 	return vm.RefreshFunc()
 }
 
-func (vm *ViewModel) Save(qv model.QueryView) error {
+func (vm *ViewModel) Save(qv model.QueryView) (bool, error) {
 	if qv.Conns == "" {
-		return errors.New("'conns' can not be empty")
+		return false, errors.New("'conns' can not be empty")
 	}
 
 	if qv.TimeRange == "" {
-		return errors.New("'timeRange' can not be empty")
+		return false, errors.New("'timeRange' can not be empty")
 	}
 
 	query := config.Query{
+		Origin:      qv.Conns,
+		Conns:       vm.Conns,
+		TimeRange:   vm.TimeRange,
 		Pattern:     qv.Pattern,
 		SelectQuery: qv.SelectQuery,
 	}
@@ -45,39 +46,23 @@ func (vm *ViewModel) Save(qv model.QueryView) error {
 	if qv.Conns != vm.Conns.String() {
 		conns, err := config.ParseConns(qv.Conns)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		reconnect = true
 		query.Conns = conns
-	} else {
-		query.Conns = vm.Conns
 	}
 
 	if qv.TimeRange != vm.TimeRange.Spec() {
 		tr, err := times.ParseFromTimeStr(time.UTC, qv.TimeRange)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		query.TimeRange = tr
-	} else {
-		query.TimeRange = vm.TimeRange
 	}
 
-	// connect
-	vm.Pattern = query.Pattern
-	vm.TimeRange = query.TimeRange
-	vm.Conns = query.Conns
+	vm.Query.Save(query)
 
-	vm.SelectQuery = query.SelectQuery
-
-	if !vm.IsConnectFunc() || reconnect {
-		if err := vm.Refresh(); err != nil {
-			return err
-		}
-	}
-
-	// query
-	return vm.DoQuery()
+	return reconnect, nil
 }

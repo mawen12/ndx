@@ -75,8 +75,17 @@ func (qcs QueryConns) Pretty() string {
 }
 
 type Query struct {
+	Origin      string
 	Conns       QueryConns
 	Pattern     string
 	TimeRange   *times.TimeRange
 	SelectQuery string
+}
+
+func (q *Query) Save(new Query) {
+	q.Origin = new.Origin
+	q.Conns = new.Conns
+	q.Pattern = new.Pattern
+	q.TimeRange = new.TimeRange
+	q.SelectQuery = new.SelectQuery
 }

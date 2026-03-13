@@ -2,9 +2,7 @@ package ui
 
 import (
 	"context"
-	"fmt"
 	"sync"
-	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal/model"
@@ -21,7 +19,7 @@ type MessageConnect struct {
 func NewMessageConnect(app *App) *MessageConnect {
 	md := &MessageConnect{
 		Modal: tview.NewModal().
-			AddButtons([]string{"Cancel"}),
+			AddButtons([]string{"OK", "Cancel"}),
 		app: app,
 	}
 
@@ -55,11 +53,13 @@ func (mc *MessageConnect) keyboard(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
-func (mc *MessageConnect) ShowError(ch NoticeCh, onCancel func()) {
+func (mc *MessageConnect) ShowError(ch NoticeCh, onOK, onCancel func()) {
 	mc.Modal.SetDoneFunc(func(index int, label string) {
 		switch index {
 		case 0:
+		case 1:
 			onCancel()
+			mc.app.Main.Pop()
 		}
 	})
 
@@ -74,7 +74,7 @@ func (mc *MessageConnect) ShowError(ch NoticeCh, onCancel func()) {
 			if cms.Connecting == nil {
 				cms.Connecting = &model.ConnectMessage{
 					Connection: notice.Conn,
-					Messages:   make([]string, 0),
+					Messages:   make([]string, 10),
 				}
 			}
 
@@ -86,38 +86,41 @@ func (mc *MessageConnect) ShowError(ch NoticeCh, onCancel func()) {
 				} else {
 					cms.Connected = append(cms.Connected, model.KV{Key: cms.Connecting.Connection, Value: notice.Message})
 				}
-
 				cms.Connecting = nil
 			}
 
-			mc.app.QueueUpdate(func() {
-				mc.SetText(cms.String())
-			})
+			mc.SetText(cms.String())
 		}
 	}()
 
-	ticker := time.NewTicker(50 * time.Millisecond)
-
-	go func() {
-		loadingChars := []string{"|", "/", "-", "\\"}
-		index := 0
-
-		for {
-			select {
-			case <-ticker.C:
-				mc.SetTitle(fmt.Sprintf("Connecting...%s", loadingChars[index]))
-				index = (index + 1) % len(loadingChars)
-			}
-		}
-	}()
+	//ticker := time.NewTicker(100 * time.Millisecond)
+	//
+	//go func() {
+	//	loadingChars := []string{"|", "/", "-", "\\"}
+	//	index := 0
+	//
+	//	for {
+	//		select {
+	//		case <-ticker.C:
+	//			mc.SetTitle(fmt.Sprintf("Connecting...%s", loadingChars[index]))
+	//			index = (index + 1) % len(loadingChars)
+	//		}
+	//	}
+	//}()
 
 	go func() {
 		wg.Wait()
-		ticker.Stop()
+		//ticker.Stop()
 
 		mc.SetTitle("Connect Finish")
 		mc.SetDoneFunc(func(index int, label string) {
-			mc.app.Main.Pop()
+			switch index {
+			case 0:
+				onOK()
+			case 1:
+				onCancel()
+				mc.app.Main.Pop()
+			}
 		})
 	}()
 

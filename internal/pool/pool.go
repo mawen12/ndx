@@ -57,11 +57,15 @@ func (p *Pool) Connect(ctx context.Context, callback func(string, string, bool))
 }
 
 func (p *Pool) IsConnected() bool {
+	if p == nil {
+		return false
+	}
+
 	return p.connected
 }
 
 func (p *Pool) run(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 
 	for {
 		select {
@@ -140,11 +144,14 @@ func (p *Pool) Stat() (s Stat) {
 }
 
 func (p *Pool) Close() {
+	if p.cancel != nil {
+		p.cancel()
+	}
+
 	if !p.connected {
 		return
 	}
 
-	p.cancel()
 	for _, c := range p.cs {
 		if c.LogClient != nil {
 			_ = c.Close()

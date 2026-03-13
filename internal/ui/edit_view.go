@@ -186,14 +186,45 @@ func (ev *EditView) keyboard(event *tcell.EventKey) *tcell.EventKey {
 				TimeRange:   ev.timeInput.GetText(),
 				SelectQuery: ev.selectQueryInput.GetText(),
 			}
-			if err := ev.app.Model.Save(qv); err != nil {
+
+			// save
+			reconnect, err := ev.app.Model.Save(qv)
+			if err != nil {
 				ev.app.MessageDialog().ShowError(Message{
-					Title:   "Log query error",
+					Title:   "Config save failed",
 					Message: err.Error(),
 					IsErr:   true,
 				})
 				return nil
 			}
+
+			// connect
+			if reconnect {
+				//retChan := make(chan struct{}, 1)
+				//callback := func() {
+				//	retChan <- struct{}{}
+				//}
+				err := ev.app.Model.Refresh()
+				if err != nil {
+					ev.app.MessageDialog().ShowError(Message{
+						Title:   "Connect failed",
+						Message: err.Error(),
+						IsErr:   true,
+					})
+					//<-retChan
+					return nil
+				}
+			}
+			// query
+			if err := ev.app.Model.DoQuery(); err != nil {
+				ev.app.MessageDialog().ShowError(Message{
+					Title:   "Query failed",
+					Message: err.Error(),
+					IsErr:   true,
+				})
+				return nil
+			}
+
 			ev.app.Main.Pop()
 			return nil
 		case "cancel":
@@ -217,7 +248,7 @@ func (ev *EditView) Hide() {
 
 func (ev *EditView) render() {
 	ev.timeInput.SetText(ev.Model.TimeRange.Spec())
-	ev.logStreamInput.SetText(ev.Model.Conns.Pretty(), false)
+	ev.logStreamInput.SetText(ev.Model.Origin, false)
 	ev.queryInput.SetText(ev.Model.Pattern)
 	ev.selectQueryInput.SetText(ev.Model.SelectQuery)
 }

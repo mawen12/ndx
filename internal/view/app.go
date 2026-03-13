@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/gdamore/tcell/v2"
@@ -32,9 +33,8 @@ func NewApp(config *config.Query) *App {
 		Config: config,
 	}
 
-	a.App.Model.IsConnectFunc = a.pool.IsConnected
-	a.App.Model.QueryFunc = a.doQuery
 	a.App.Model.RefreshFunc = a.refresh
+	a.App.Model.QueryFunc = a.query
 
 	return &a
 }
@@ -52,18 +52,14 @@ func (a *App) Init() error {
 
 	a.Main.AddListener(a)
 
-	a.pool = pool.NewPool(a.Config.Conns)
-
-	a.pool.AddListener(a)
-
 	return nil
 }
 
 func (a *App) Run() error {
-	go a.refresh()
-
 	a.SetRunning(true)
 	slog.Info("App is running")
+
+	go a.EditView().Show()
 
 	if err := a.Application.Run(); err != nil {
 		return err
@@ -118,7 +114,45 @@ func (a *App) OnStat(stat pool.Stat) {
 	})
 }
 
-func (a *App) doQuery() error {
+func (a *App) refresh() error {
+	if a.pool != nil {
+		a.pool.Close()
+	}
+
+	a.pool = pool.NewPool(a.Config.Conns)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	noticeCh := make(chan model.Notice, 10)
+
+	callback := func(conn, message string, finished bool) {
+		noticeCh <- model.Notice{Conn: conn, Message: message, Finished: finished}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	onOk := func() {
+		defer wg.Done()
+	}
+	onCancel := func() {
+		defer wg.Done()
+		cancel()
+	}
+	a.MessageConnect().ShowError(noticeCh, onOk, onCancel)
+
+	err := a.pool.Connect(ctx, callback)
+	close(noticeCh)
+	wg.Wait()
+	if err != nil {
+		return err
+	}
+
+	a.pool.AddListener(a)
+	return nil
+}
+
+func (a *App) query() error {
 	result, err := a.pool.Query(context.Background(), *a.Config)
 	if err != nil {
 		return err
@@ -134,29 +168,11 @@ func (a *App) doQuery() error {
 	return nil
 }
 
-func (a *App) refresh() error {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	noticeCh := make(chan model.Notice, 10)
-
-	callback := func(conn, message string, finished bool) {
-		noticeCh <- model.Notice{Conn: conn, Message: message, Finished: finished}
-	}
-
-	a.MessageConnect().ShowError(noticeCh, cancel)
-
-	err := a.pool.Connect(ctx, callback)
-	if err != nil {
-		slog.Error("connect failed", "error", err)
-	}
-
-	close(noticeCh)
-	return nil
-}
-
 func (a *App) StackPushed(c model.Component) {
 	c.Start()
-	a.SetFocus(c)
+	a.QueueUpdateDraw(func() {
+		a.SetFocus(c)
+	})
 }
 
 func (a *App) StackPopped(old, new model.Component) {
