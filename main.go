@@ -71,10 +71,7 @@ func main() {
 	// new app
 	app = viewv2.NewApp(q)
 
-	//if err := app.Init(); err != nil {
-	//	slog.Error("app init failed", "error", err)
-	//	os.Exit(1)
-	//}
+	app.Init()
 
 	// start app
 	if err := app.Run(); err != nil {

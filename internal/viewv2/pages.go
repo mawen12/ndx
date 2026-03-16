@@ -1,24 +1,29 @@
 package viewv2
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
+	"github.com/mawen12/ndx/internal"
+	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
 type Pages struct {
 	*tview.Pages
 
-	app   *App
-	stack *Stack
+	stack  *model.Stack
+	holder *model.Holder[internal.PageKey, model.Page]
+
+	app *App
 }
 
-func NewPages(app *App) *Pages {
+func NewPages() *Pages {
 	p := &Pages{
-		Pages: tview.NewPages(),
-		app:   app,
-		stack: NewStack(),
+		Pages:  tview.NewPages(),
+		stack:  model.NewStack(),
+		holder: model.NewHolder[internal.PageKey, model.Page](),
 	}
 
 	p.stack.AddListener(p)
@@ -26,8 +31,18 @@ func NewPages(app *App) *Pages {
 	return p
 }
 
-func (p *Pages) Show(c Component) {
-	p.stack.Push(c)
+func (p *Pages) Init(ctx context.Context) {
+	p.app = extractApp(ctx)
+
+	p.holder.Init(ctx)
+}
+
+func (p *Pages) Add(c model.Page) {
+	p.holder.Add(c.Name(), c)
+}
+
+func (p *Pages) Show(name internal.PageKey) {
+	p.stack.Push(p.holder.MustGet(name))
 }
 
 func (p *Pages) Hide() {
@@ -36,34 +51,36 @@ func (p *Pages) Hide() {
 
 // stack listener
 
-func (p *Pages) Pushed(c Component) {
+func (p *Pages) Pushed(c model.Page) {
 	p.add(c)
 	p.show(c)
 }
 
-func (p *Pages) Poped(old, new Component) {
+func (p *Pages) Popped(old, new model.Page) {
 	p.delete(old)
 	old.Stop()
 	p.Top(new)
 }
 
-func (p *Pages) Top(c Component) {
+func (p *Pages) Top(c model.Page) {
 	if c != nil {
 		p.show(c)
 	}
 }
 
-func (p *Pages) add(c Component) {
-	p.AddPage(componentID(c), c, true, true)
+// internal method
+
+func (p *Pages) add(c model.Page) {
+	p.AddPage(pageID(c), c, true, true)
 }
 
-func (p *Pages) delete(c Component) {
-	p.RemovePage(componentID(c))
+func (p *Pages) delete(c model.Page) {
+	p.RemovePage(pageID(c))
 }
 
-func (p *Pages) show(c Component) {
-	if !c.Modal() {
-		p.SwitchToPage(componentID(c))
+func (p *Pages) show(c model.Page) {
+	if !c.IsModal() {
+		p.SwitchToPage(pageID(c))
 	}
 
 	c.Start()
@@ -71,6 +88,6 @@ func (p *Pages) show(c Component) {
 	slog.Info("Show and focus component", "component", c.Name())
 }
 
-func componentID(c Component) string {
+func pageID(c model.Page) string {
 	return fmt.Sprintf("%s-%p", c.Name(), c)
 }
