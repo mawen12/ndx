@@ -23,6 +23,10 @@ func ParseConns(conns string) (QueryConns, error) {
 			return nil, err
 		}
 
+		if qc.Scheme != "ssh" && qc.Scheme != "cmd" {
+			return nil, fmt.Errorf("invalid scheme(%s), only support ssh/cmd", qc.Scheme)
+		}
+
 		queryConns = append(queryConns, qc)
 	}
 

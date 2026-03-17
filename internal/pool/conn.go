@@ -9,11 +9,6 @@ import (
 	"github.com/mawen12/ndx/internal/model"
 )
 
-type Notice struct {
-	Message string
-	Err     error
-}
-
 type Conn struct {
 	*logclient.LogClient
 	Conn *config.QueryConn
@@ -25,7 +20,7 @@ func NewConn(conn *config.QueryConn) *Conn {
 	}
 }
 
-func (c *Conn) Connect(ctx context.Context, callback func(string, bool)) error {
+func (c *Conn) Connect(ctx context.Context, callback func(string)) error {
 	client, err := logclient.Connect(ctx, c.Conn, callback)
 	if err != nil {
 		return err

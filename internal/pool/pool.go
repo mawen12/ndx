@@ -13,7 +13,8 @@ import (
 )
 
 type Pool struct {
-	cs map[string]*Conn
+	conns config.QueryConns
+	cs    map[string]*Conn
 
 	connected bool
 	cancel    context.CancelFunc
@@ -23,6 +24,7 @@ type Pool struct {
 func NewPool(conns config.QueryConns) *Pool {
 	p := Pool{}
 
+	p.conns = conns
 	p.cs = make(map[string]*Conn)
 	for _, part := range conns {
 		p.cs[part.Origin] = NewConn(part)
@@ -36,19 +38,19 @@ func NewPool(conns config.QueryConns) *Pool {
 	return &p
 }
 
-func (p *Pool) Connect(ctx context.Context, callback func(string, string, bool)) error {
-	for _, conn := range p.cs {
-		cb := func(message string, finished bool) {
-			callback(conn.Conn.Origin, message, finished)
+func (p *Pool) Connect(ctx context.Context, callback func(string, string, bool, bool)) error {
+	for _, conn := range p.conns {
+		cb := func(message string) {
+			callback(conn.Origin, message, false, false)
 		}
 
-		err := conn.Connect(ctx, cb)
+		err := p.cs[conn.Origin].Connect(ctx, cb)
 		if err != nil {
-			cb(err.Error(), true)
+			callback(conn.Origin, err.Error(), false, true)
 			return err
 		}
 
-		cb("", true)
+		callback(conn.Origin, "", true, true)
 	}
 
 	p.connected = true

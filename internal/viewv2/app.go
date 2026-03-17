@@ -23,6 +23,7 @@ type App struct {
 	Pool       *pool.Pool
 	Result     pool.MergedResult
 
+	Render   bool
 	routines atomic.Int64
 }
 
@@ -180,11 +181,23 @@ func (app *App) Close() error {
 }
 
 func (app *App) Show(name internal.PageKey) {
-	app.pages.Show(name)
+	app.QueueUpdateDraw(func() {
+		app.pages.Show(name)
+	})
+
 }
 
 func (app *App) Hide() {
-	app.pages.Hide()
+	app.QueueUpdateDraw(func() {
+		app.pages.Hide()
+	})
+}
+
+func (app *App) HideTwice() {
+	app.QueueUpdateDraw(func() {
+		app.pages.Hide()
+		app.pages.Hide()
+	})
 }
 
 func (app *App) Background(handle func()) {
@@ -196,22 +209,18 @@ func (app *App) Background(handle func()) {
 	}()
 }
 
-func (app *App) Connect(ctx context.Context, callback func(conn, message string, finished bool)) error {
+func (app *App) Connect(ctx context.Context, callback func(conn, message string, success bool, finished bool)) error {
 	conns, err := config.ParseConns(app.ConfigView.Conns)
 	if err != nil {
-		panic("app connect not implemented")
 		return err
 	}
 
+	if app.Pool != nil {
+		app.Pool.Close()
+	}
 	app.Pool = pool.NewPool(conns)
 
-	err = app.Pool.Connect(ctx, callback)
-	if err != nil {
-		//t.app.Pool = p
-		panic("app connect not implemented")
-		return err
-	}
-	return nil
+	return app.Pool.Connect(ctx, callback)
 }
 
 func (app *App) Query(ctx context.Context) error {
@@ -224,6 +233,7 @@ func (app *App) Query(ctx context.Context) error {
 		return err
 	}
 
+	app.Render = true
 	app.Result = ret
 	return nil
 }

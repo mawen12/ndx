@@ -2,14 +2,11 @@ package viewv2
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal"
-	"github.com/mawen12/ndx/internal/config"
 	"github.com/mawen12/ndx/internal/model"
-	"github.com/mawen12/ndx/internal/pool"
 	"github.com/rivo/tview"
 )
 
@@ -22,7 +19,7 @@ type ConnectModal struct {
 	app         *App
 	cancel      context.CancelFunc
 	connectTask *ConnectTask
-	messageChan <-chan model.Notice
+	messageChan <-chan ConnectMessage
 }
 
 func NewConnectModal() *ConnectModal {
@@ -67,15 +64,6 @@ func (c *ConnectModal) Init(ctx context.Context) {
 }
 
 func (c *ConnectModal) Start() {
-	//content := c.app.components.MustGet(internal.ConnectModalContentComponent).(*TextDesc)
-
-	conns, err := config.ParseConns(c.app.ConfigView.Conns)
-	if err != nil {
-		c.SetText(fmt.Sprintf("[ERROR]: conns(%s) is invalid", c.app.ConfigView.Conns))
-		//content.SetText(fmt.Sprintf("[ERROR]: conns(%s) is invalid", c.app.ConfigView.Conns))
-		return
-	}
-
 	c.connectTask.Reset()
 	c.messageChan = c.connectTask.Chan()
 
@@ -88,38 +76,56 @@ func (c *ConnectModal) Start() {
 			select {
 			case <-ctx.Done():
 				return
-			case notice, ok := <-c.messageChan:
+			case message, ok := <-c.messageChan:
 				if !ok {
 					return
 				}
 
-				if cms.Connecting == nil {
-					cms.Connecting = &model.ConnectMessage{
-						Connection: notice.Conn,
-						Messages:   make([]string, 10),
+				switch {
+				case message.Pause:
+					if message.Err != nil {
+						c.app.QueueUpdateDraw(func() {
+							c.SetText(message.Err.Error())
+						})
 					}
-				}
+					return
+				case message.Title != "":
+					c.app.QueueUpdateDraw(func() {
+						c.SetTitle(message.Title)
+						c.SetText("")
+						cms.Connecting = nil
+					})
+				case message.Connecting != nil:
+					if cms.Connecting == nil {
+						cms.Connecting = &model.ConnectMessage{
+							Connection: message.Connecting.Conn,
+							Messages:   make([]string, 10),
+						}
+					}
 
-				if !notice.Finished {
-					cms.Connecting.Messages = append(cms.Connecting.Messages, notice.Message)
-				} else {
-					if notice.Success {
-						cms.Connected = append(cms.Connected, model.KV{Key: cms.Connecting.Connection, Value: ""})
+					if message.Connecting.Finished {
+						if message.Connecting.Success {
+							cms.Connected = append(cms.Connected, model.KV{Key: cms.Connecting.Connection, Value: ""})
+						} else {
+							cms.Connected = append(cms.Connected, model.KV{Key: cms.Connecting.Connection, Value: message.Connecting.Message})
+						}
+						cms.Connecting = nil
 					} else {
-						cms.Connected = append(cms.Connected, model.KV{Key: cms.Connecting.Connection, Value: notice.Message})
+						cms.Connecting.Messages = append(cms.Connecting.Messages, message.Connecting.Message)
 					}
-					cms.Connecting = nil
-				}
 
-				c.app.QueueUpdateDraw(func() {
-					//content.SetText(cms.String())
-					c.SetText(cms.String())
-				})
+					c.app.QueueUpdateDraw(func() {
+						c.SetText(cms.String())
+					})
+				default:
+					c.app.HideTwice()
+					return
+				}
 			}
 		}
 	})
 
-	c.connectTask.Start(conns)
+	c.connectTask.Start()
 }
 
 func (c *ConnectModal) Stop() {
@@ -134,54 +140,12 @@ func (c *ConnectModal) IsModal() bool {
 	return true
 }
 
-//func (cm *ConnectModal) Draw(screen tcell.Screen) {
-//	// cm.SetRect(x, y, width/2, height/2)
-//	screenWidth, screenHeight := screen.Size()
-//
-//	// cm.SetRect(0, 0, screenWidth, screenHeight) // 全屏
-//
-//	cm.SetRect(screenWidth/4, screenHeight/4, screenWidth/2, screenHeight/2) // 左右
-//
-//	cm.Box.DrawForSubclass(screen, cm)
-//	x, y, width, height := cm.GetInnerRect()
-//	cm.frame.SetRect(x, y, width, height)
-//	cm.frame.Draw(screen)
-//}
-
-//func (cm *ConnectModal) Focus(delegate func(p tview.Primitive)) {
-//	delegate(cm.form)
-//}
-//
-//func (cm *ConnectModal) Blur() {
-//	cm.form.Blur()
-//}
-//
-//func (cm *ConnectModal) HasFocus() bool {
-//	return cm.form.HasFocus()
-//}
-
-//func (cm *ConnectModal) MouseHandler() func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, capture tview.Primitive) {
-//	return cm.WrapMouseHandler(func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, capture tview.Primitive) {
-//		// Pass mouse events on to the form.
-//		consumed, capture = cm.form.MouseHandler()(action, event, setFocus)
-//		if !consumed && action == tview.MouseLeftDown && cm.InRect(event.Position()) {
-//			setFocus(cm)
-//			consumed = true
-//		}
-//		return
-//	})
-//}
-//
-//func (m *ConnectModal) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-//	return m.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-//		if m.frame.HasFocus() {
-//			if handler := m.frame.InputHandler(); handler != nil {
-//				handler(event, setFocus)
-//				return
-//			}
-//		}
-//	})
-//}
+type ConnectMessage struct {
+	Title      string
+	Connecting *model.Notice
+	Pause      bool
+	Err        error
+}
 
 type ConnectTask struct {
 	mu  sync.Mutex
@@ -189,7 +153,7 @@ type ConnectTask struct {
 
 	cancel context.CancelFunc
 
-	messageChan chan model.Notice
+	messageChan chan ConnectMessage
 
 	startOnce sync.Once
 	closeOnce sync.Once
@@ -197,7 +161,7 @@ type ConnectTask struct {
 
 func NewConnectTask() *ConnectTask {
 	return &ConnectTask{
-		messageChan: make(chan model.Notice, 10),
+		messageChan: make(chan ConnectMessage, 10),
 	}
 }
 
@@ -207,16 +171,16 @@ func (t *ConnectTask) Reset() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.messageChan = make(chan model.Notice, 10)
+	t.messageChan = make(chan ConnectMessage, 10)
 	t.startOnce = sync.Once{}
 	t.closeOnce = sync.Once{}
 }
 
-func (t *ConnectTask) Chan() <-chan model.Notice {
+func (t *ConnectTask) Chan() <-chan ConnectMessage {
 	return t.messageChan
 }
 
-func (t *ConnectTask) Start(conns config.QueryConns) {
+func (t *ConnectTask) Start() {
 	t.startOnce.Do(func() {
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -227,25 +191,31 @@ func (t *ConnectTask) Start(conns config.QueryConns) {
 		t.app.Background(func() {
 			defer close(t.messageChan)
 
-			p := pool.NewPool(conns)
-
-			callback := func(conn, message string, finished bool) {
-				t.messageChan <- model.Notice{Conn: conn, Message: message, Finished: finished}
+			callback := func(conn, message string, success, finsihed bool) {
+				t.messageChan <- ConnectMessage{Connecting: &model.Notice{
+					Conn:     conn,
+					Message:  message,
+					Success:  success,
+					Finished: finsihed,
+				}}
 			}
 
-			err := p.Connect(ctx, callback)
-			if err == nil {
-				t.app.Pool = p
+			t.messageChan <- ConnectMessage{Title: "Step 1: Connecting"}
+			err := t.app.Connect(ctx, callback)
+			if err != nil {
+				t.messageChan <- ConnectMessage{Pause: true, Err: err}
+				return
 			}
 
 			// query
+			t.messageChan <- ConnectMessage{Title: "Step 2: Querying..."}
 
-			//ret, err := p.Query(ctx, *t.app.Config)
-			//if err != nil {
-			//	t.messageChan <- model.Notice{Conn: "", Message: err.Error(), Finished: true}
-			//}
-			//
-			//
+			err = t.app.Query(ctx)
+			if err != nil {
+				t.messageChan <- ConnectMessage{Pause: true, Err: err}
+			}
+
+			t.messageChan <- ConnectMessage{}
 		})
 	})
 }

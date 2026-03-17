@@ -44,7 +44,9 @@ func (m *MainPage) Init(ctx context.Context) {
 }
 
 func (m *MainPage) Start() {
-	panic("main page should render app result")
+	if m.app.Render {
+		panic("main page should render app result")
+	}
 }
 
 func (m *MainPage) Stop() {
