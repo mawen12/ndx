@@ -37,16 +37,16 @@ type LogClient struct {
 	cleanupDone chan struct{}
 }
 
-func Connect(ctx context.Context, qc *config.QueryConn, callback func(string)) (*LogClient, error) {
-	return ConnectConfig(ctx, NewConfig(qc), callback)
+func Connect(ctx context.Context, qc *config.QueryConn) (*LogClient, error) {
+	return ConnectConfig(ctx, NewConfig(qc))
 }
 
-func ConnectConfig(ctx context.Context, config *Config, callback func(string)) (c *LogClient, err error) {
+func ConnectConfig(ctx context.Context, config *Config) (c *LogClient, err error) {
 	if !config.CreatedByParseConfig {
 		panic("config must be created by ParseConfig")
 	}
 
-	c, err = connect(ctx, config, callback)
+	c, err = connect(ctx, config)
 	if err != nil {
 		return nil, &connectError{config: config, msg: "server error", err: err}
 	}
@@ -54,7 +54,7 @@ func ConnectConfig(ctx context.Context, config *Config, callback func(string)) (
 	return c, nil
 }
 
-func connect(ctx context.Context, config *Config, callback func(string)) (*LogClient, error) {
+func connect(ctx context.Context, config *Config) (*LogClient, error) {
 	c := new(LogClient)
 	c.parameterStatuses = make(map[string]string)
 	c.location = time.UTC
@@ -100,18 +100,12 @@ func connect(ctx context.Context, config *Config, callback func(string)) (*LogCl
 			if msg.Name == "tz" {
 				location, err := time.LoadLocation(msg.Value)
 				if err != nil {
-					if callback != nil {
-						callback(err.Error())
-					}
 					slog.Error("connect receive ParameterStatus message, can not parse tz", "error", err, "msg", msg.Value)
 				} else {
 					c.location = location
 				}
 			}
 		case *proto.NoticeResponse:
-			if callback != nil {
-				callback(msg.Message)
-			}
 		default:
 			c.conn.Close()
 			return nil, &connectError{config: config, msg: "received unexpected message", err: err}

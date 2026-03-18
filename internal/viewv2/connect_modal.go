@@ -11,9 +11,6 @@ import (
 )
 
 type ConnectModal struct {
-	//*tview.Box
-	//frame *tview.Frame
-	//form  *tview.Form
 	*tview.Modal
 
 	app         *App
@@ -24,13 +21,9 @@ type ConnectModal struct {
 
 func NewConnectModal() *ConnectModal {
 	c := &ConnectModal{
-		Modal: tview.NewModal(),
-		//Box:         tview.NewBox(),
-		//form:        tview.NewForm(),
+		Modal:       tview.NewModal(),
 		connectTask: NewConnectTask(),
 	}
-
-	//c.frame = tview.NewFrame(c.form)
 
 	return c
 }
@@ -42,12 +35,6 @@ func (c *ConnectModal) Name() internal.PageKey {
 func (c *ConnectModal) Init(ctx context.Context) {
 	c.app = extractApp(ctx)
 	c.connectTask.app = c.app
-
-	//c.form.AddFormItem(c.app.components.MustGet(internal.ConnectModalContentComponent).(*TextDesc))
-	//
-	//c.form.AddButton("Cancel", func() {
-	//	c.app.Hide()
-	//})
 
 	c.AddButtons([]string{"Cancel"})
 
@@ -191,24 +178,32 @@ func (t *ConnectTask) Start() {
 		t.app.Background(func() {
 			defer close(t.messageChan)
 
-			callback := func(conn, message string, success, finsihed bool) {
-				t.messageChan <- ConnectMessage{Connecting: &model.Notice{
-					Conn:     conn,
-					Message:  message,
-					Success:  success,
-					Finished: finsihed,
-				}}
-			}
+			//callback := func(conn, message string, success, finished bool) {
+			//	t.messageChan <- ConnectMessage{Connecting: &model.Notice{
+			//		Conn:     conn,
+			//		Message:  message,
+			//		Success:  success,
+			//		Finished: finished,
+			//	}}
+			//}
 
-			t.messageChan <- ConnectMessage{Title: "Step 1: Connecting"}
-			err := t.app.Connect(ctx, callback)
+			t.messageChan <- ConnectMessage{Title: "Step 1: Parsing"}
+			query, err := t.app.Parse()
 			if err != nil {
 				t.messageChan <- ConnectMessage{Pause: true, Err: err}
 				return
 			}
 
+			t.messageChan <- ConnectMessage{Title: "Step 2: Connecting"}
+			if err := t.app.Connect(ctx, *query); err != nil {
+				t.messageChan <- ConnectMessage{Pause: true, Err: err}
+				return
+			}
+
+			t.app.SetQuery(query)
+
 			// query
-			t.messageChan <- ConnectMessage{Title: "Step 2: Querying..."}
+			t.messageChan <- ConnectMessage{Title: "Step 3: Querying..."}
 
 			err = t.app.Query(ctx)
 			if err != nil {

@@ -10,7 +10,8 @@ import (
 type MainPage struct {
 	*tview.Flex
 	topFlex *tview.Flex
-	app     *App
+
+	app *App
 }
 
 func NewMainPage() *MainPage {
@@ -44,8 +45,9 @@ func (m *MainPage) Init(ctx context.Context) {
 }
 
 func (m *MainPage) Start() {
-	if m.app.Render {
-		panic("main page should render app result")
+	if m.app.ShouldRender {
+		m.app.Render()
+		m.app.ShouldRender = false
 	}
 }
 
@@ -55,4 +57,12 @@ func (m *MainPage) Stop() {
 
 func (m *MainPage) IsModal() bool {
 	return false
+}
+
+func (m *MainPage) RefreshQuery() {
+	m.app.QueueUpdateDraw(func() {
+		m.app.components.MustGet(internal.QueryComponent).(*Query).SetText(m.app.Config.Pattern)
+		m.app.components.MustGet(internal.TimeLabelComponent).(*TimeLabel).SetText(m.app.Config.TimeRange.String())
+		m.topFlex.ResizeItem(m.app.components.MustGet(internal.TimeLabelComponent), tview.TaggedStringWidth(m.app.Config.TimeRange.String()), 0)
+	})
 }

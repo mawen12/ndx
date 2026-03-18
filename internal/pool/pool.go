@@ -38,19 +38,12 @@ func NewPool(conns config.QueryConns) *Pool {
 	return &p
 }
 
-func (p *Pool) Connect(ctx context.Context, callback func(string, string, bool, bool)) error {
+func (p *Pool) Connect(ctx context.Context) error {
 	for _, conn := range p.conns {
-		cb := func(message string) {
-			callback(conn.Origin, message, false, false)
-		}
-
-		err := p.cs[conn.Origin].Connect(ctx, cb)
+		err := p.cs[conn.Origin].Connect(ctx)
 		if err != nil {
-			callback(conn.Origin, err.Error(), false, true)
 			return err
 		}
-
-		callback(conn.Origin, "", true, true)
 	}
 
 	p.connected = true

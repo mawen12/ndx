@@ -5,7 +5,6 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal"
-	"github.com/mawen12/ndx/internal/model"
 	"github.com/rivo/tview"
 )
 
@@ -79,24 +78,13 @@ func (e *EditModal) Init(ctx context.Context) {
 }
 
 func (e *EditModal) Start() {
-	m := &model.QueryView{
-		Conns:       e.app.Config.Origin,
-		Pattern:     e.app.Config.Pattern,
-		TimeRange:   e.app.Config.TimeRange.Spec(),
-		SelectQuery: e.app.Config.SelectQuery,
-	}
-
-	e.time.SetText(m.TimeRange)
-	e.query.SetText(m.Pattern)
-	e.logStreams.SetText(m.Conns, false)
-	e.selectQuery.SetText(m.SelectQuery)
+	e.time.SetText(e.app.ConfigView.TimeRange)
+	e.query.SetText(e.app.ConfigView.Pattern)
+	e.logStreams.SetText(e.app.ConfigView.Conns, false)
+	e.selectQuery.SetText(e.app.ConfigView.SelectQuery)
 }
 
 func (e *EditModal) Stop() {
-	e.app.ConfigView.TimeRange = e.time.GetText()
-	e.app.ConfigView.Pattern = e.query.GetText()
-	e.app.ConfigView.Conns = e.logStreams.GetText()
-	e.app.ConfigView.SelectQuery = e.logStreams.GetText()
 }
 
 func (e *EditModal) IsModal() bool {

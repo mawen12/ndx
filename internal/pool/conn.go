@@ -20,8 +20,8 @@ func NewConn(conn *config.QueryConn) *Conn {
 	}
 }
 
-func (c *Conn) Connect(ctx context.Context, callback func(string)) error {
-	client, err := logclient.Connect(ctx, c.Conn, callback)
+func (c *Conn) Connect(ctx context.Context) error {
+	client, err := logclient.Connect(ctx, c.Conn)
 	if err != nil {
 		return err
 	}

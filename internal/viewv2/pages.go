@@ -41,6 +41,10 @@ func (p *Pages) Add(c model.Page) {
 	p.holder.Add(c.Name(), c)
 }
 
+func (p *Pages) MustGet(name internal.PageKey) model.Page {
+	return p.holder.MustGet(name)
+}
+
 func (p *Pages) Show(name internal.PageKey) {
 	p.stack.Push(p.holder.MustGet(name))
 }
@@ -52,33 +56,33 @@ func (p *Pages) Hide() {
 // stack listener
 
 func (p *Pages) Pushed(c model.Page) {
-	p.add(c)
-	p.show(c)
+	p.addPage(c)
+	p.showPage(c)
 }
 
 func (p *Pages) Popped(old, new model.Page) {
-	p.delete(old)
+	p.deletePage(old)
 	old.Stop()
 	p.Top(new)
 }
 
 func (p *Pages) Top(c model.Page) {
 	if c != nil {
-		p.show(c)
+		p.showPage(c)
 	}
 }
 
 // internal method
 
-func (p *Pages) add(c model.Page) {
+func (p *Pages) addPage(c model.Page) {
 	p.AddPage(pageID(c), c, true, true)
 }
 
-func (p *Pages) delete(c model.Page) {
+func (p *Pages) deletePage(c model.Page) {
 	p.RemovePage(pageID(c))
 }
 
-func (p *Pages) show(c model.Page) {
+func (p *Pages) showPage(c model.Page) {
 	if !c.IsModal() {
 		p.SwitchToPage(pageID(c))
 	}

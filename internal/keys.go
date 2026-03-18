@@ -38,4 +38,6 @@ const (
 	KeyMainPage     PageKey = "main_page"
 	KeyEditModal    PageKey = "edit_modal"
 	KeyConnectModal PageKey = "connect_modal"
+	KeyChannelModal PageKey = "channel_modal"
+	KeyMessageModal PageKey = "message_modal"
 )

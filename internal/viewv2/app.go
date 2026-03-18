@@ -2,13 +2,16 @@ package viewv2
 
 import (
 	"context"
+	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/mawen12/ndx/internal"
 	"github.com/mawen12/ndx/internal/config"
 	"github.com/mawen12/ndx/internal/model"
 	"github.com/mawen12/ndx/internal/pool"
+	"github.com/mawen12/ndx/pkg/times"
 	"github.com/rivo/tview"
 )
 
@@ -23,8 +26,8 @@ type App struct {
 	Pool       *pool.Pool
 	Result     pool.MergedResult
 
-	Render   bool
-	routines atomic.Int64
+	ShouldRender bool
+	routines     atomic.Int64
 }
 
 func NewApp(config *config.Query) *App {
@@ -75,11 +78,34 @@ func (app *App) Init() {
 				app.SetFocus(app.components.MustGet(internal.EditViewSelectQueryComponent))
 				return nil
 			case tcell.KeyEnter:
-				app.Show(internal.KeyConnectModal)
+				//app.Show(internal.KeyConnectModal)
+
+				query, err := app.Parse()
+				if err != nil {
+					app.pages.MustGet(internal.KeyMessageModal).(*MessageModal).SetErrorMessage(err.Error())
+					app.Show(internal.KeyMessageModal)
+					return nil
+				}
+
+				if err = app.Connect(context.Background(), *query); err != nil {
+					app.pages.MustGet(internal.KeyMessageModal).(*MessageModal).SetErrorMessage(err.Error())
+					app.Show(internal.KeyMessageModal)
+					return nil
+				}
+
+				if err = app.Query(context.Background()); err != nil {
+					app.pages.MustGet(internal.KeyMessageModal).(*MessageModal).SetErrorMessage(err.Error())
+					app.Show(internal.KeyMessageModal)
+					return nil
+				}
+				app.Hide()
+				app.Render()
 				return nil
 			}
 			return event
 		})
+
+		t.SetChangedFunc(app.ConfigView.SetTimeRange)
 
 		t.SetText(app.Config.TimeRange.Spec())
 	}))
@@ -102,6 +128,8 @@ func (app *App) Init() {
 			}
 			return event
 		})
+
+		t.SetChangedFunc(app.ConfigView.SetPattern)
 
 		t.SetText(app.Config.Pattern)
 	}))
@@ -127,6 +155,8 @@ func (app *App) Init() {
 			return event
 		})
 
+		t.SetChangedFunc(app.ConfigView.SetSelectQuery)
+
 		t.SetText(app.Config.SelectQuery)
 	}))
 
@@ -139,6 +169,8 @@ func (app *App) Init() {
 	app.pages.Add(NewMainPage())
 	app.pages.Add(NewEditModal())
 	app.pages.Add(NewConnectModal())
+	app.pages.Add(NewChannelModal())
+	app.pages.Add(NewMessageModal())
 
 	// init page
 	app.pages.Init(ctx)
@@ -147,6 +179,7 @@ func (app *App) Init() {
 func (app *App) Run() error {
 	app.SetRoot(app.pages, true)
 	app.Show(internal.KeyMainPage)
+	app.Show(internal.KeyEditModal)
 
 	if err := app.Application.Run(); err != nil {
 		return err
@@ -184,7 +217,6 @@ func (app *App) Show(name internal.PageKey) {
 	app.QueueUpdateDraw(func() {
 		app.pages.Show(name)
 	})
-
 }
 
 func (app *App) Hide() {
@@ -209,18 +241,39 @@ func (app *App) Background(handle func()) {
 	}()
 }
 
-func (app *App) Connect(ctx context.Context, callback func(conn, message string, success bool, finished bool)) error {
-	conns, err := config.ParseConns(app.ConfigView.Conns)
+func (app *App) SetQuery(query *config.Query) {
+	app.Config = query
+
+	app.pages.MustGet(internal.KeyMainPage).(*MainPage).RefreshQuery()
+}
+
+func (app *App) Parse() (query *config.Query, err error) {
+	query = &config.Query{}
+	slog.Info("Parsing the config view", "timeRange", app.ConfigView.TimeRange, "query", app.ConfigView.Pattern, "conns", app.ConfigView.Conns, "selectQuery", app.ConfigView.SelectQuery)
+
+	query.TimeRange, err = times.ParseFromTimeStr(time.UTC, app.ConfigView.TimeRange)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	query.Conns, err = config.ParseConns(app.ConfigView.Conns)
+	if err != nil {
+		return nil, err
+	}
+
+	query.Origin = app.ConfigView.Conns
+	query.Pattern = app.ConfigView.Pattern
+	query.SelectQuery = app.ConfigView.SelectQuery
+	return
+}
+
+func (app *App) Connect(ctx context.Context, query config.Query) error {
 	if app.Pool != nil {
 		app.Pool.Close()
 	}
-	app.Pool = pool.NewPool(conns)
+	app.Pool = pool.NewPool(query.Conns)
 
-	return app.Pool.Connect(ctx, callback)
+	return app.Pool.Connect(ctx)
 }
 
 func (app *App) Query(ctx context.Context) error {
@@ -233,9 +286,24 @@ func (app *App) Query(ctx context.Context) error {
 		return err
 	}
 
-	app.Render = true
+	app.ShouldRender = true
 	app.Result = ret
 	return nil
+}
+
+func (app *App) Render() {
+	histogram := app.components.MustGet(internal.HistogramComponent).(*Histogram)
+	table := app.components.MustGet(internal.TableComponent).(*Table)
+	cmd := app.components.MustGet(internal.CmdComponent).(*Cmd)
+
+	app.QueueUpdateDraw(func() {
+		histogram.SetRange(int(app.Config.TimeRange.ActualFrom.Unix()), int(app.Config.TimeRange.ActualTo.Unix()))
+		histogram.SetData(app.Result.Stat)
+
+		table.ShowLogs(app.Result.Lines)
+
+		cmd.ShowQueryDuration(app.Result.Duration)
+	})
 }
 
 func extractApp(ctx context.Context) *App {

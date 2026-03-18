@@ -142,7 +142,12 @@ func (q *Query) Init(ctx context.Context) {
 			app.SetFocus(app.components.MustGet(internal.EditBtnComponent))
 			return nil
 		case tcell.KeyBacktab:
-			app.SetFocus(app.components.MustGet(internal.EditBtnComponent))
+			app.SetFocus(app.components.MustGet(internal.TableComponent))
+			return nil
+		case tcell.KeyEnter:
+			app.Config.Pattern = q.GetText()
+			app.Query(context.Background())
+			app.Render()
 			return nil
 		}
 		return event
@@ -213,7 +218,7 @@ func (e *EditBtn) Init(ctx context.Context) {
 	e.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyTab:
-			app.SetFocus(app.components.MustGet(internal.QueryComponent))
+			app.SetFocus(app.components.MustGet(internal.HistogramComponent))
 			return nil
 		case tcell.KeyBacktab:
 			app.SetFocus(app.components.MustGet(internal.QueryComponent))
@@ -463,6 +468,40 @@ func (t *Table) Init(ctx context.Context) {
 	})
 }
 
+func (t *Table) ShowLogs(lines []model.LogLine) {
+	t.Clear()
+
+	newTableCellFunc := func(line model.LogLine) []*tview.TableCell {
+		lines := strings.Split(line.OriginalLine(), "\000")
+		tcs := make([]*tview.TableCell, len(lines))
+		for i, l := range lines {
+			tc := tview.NewTableCell(tview.Escape(l)).
+				SetSelectable(true).
+				SetAttributes(tcell.AttrBold).
+				SetAttributes(tview.AlignLeft).
+				SetSelectedStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue)).
+				SetStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite))
+
+			tc.SetReference(line)
+
+			tcs[i] = tc
+		}
+
+		return tcs
+	}
+
+	var rowIndex int
+	for _, line := range lines {
+		for _, cell := range newTableCellFunc(line) {
+			t.SetCell(rowIndex, 0, cell)
+			rowIndex++
+		}
+	}
+
+	t.Select(len(lines)-1, 0)
+	t.ScrollToEnd()
+}
+
 type StatusLine struct {
 	*tview.Flex
 }
@@ -532,6 +571,10 @@ func (c *Cmd) SetPrev(p tview.Primitive) {
 	c.prev = p
 }
 
+func (c *Cmd) ShowQueryDuration(duration time.Duration) {
+	c.SetText(fmt.Sprintf("Query cost %dms", duration.Milliseconds()))
+}
+
 type LogStreamsInput struct {
 	*tview.TextArea
 }
@@ -582,4 +625,8 @@ func (l *LogStreamsInput) Init(ctx context.Context) {
 	})
 
 	l.SetText(app.Config.Origin, false)
+
+	l.SetChangedFunc(func() {
+		app.ConfigView.SetConns(l.GetText())
+	})
 }

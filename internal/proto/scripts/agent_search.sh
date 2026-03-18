@@ -52,7 +52,7 @@ run_search() {
         prevNR = NR;
       } else {
         # 续行：追加到当前日志，用空格分离
-        currentLog = currentLog " " $0;
+        currentLog = sprintf("%s%c%s", currentLog, 0, $0);
       }
     }
 
