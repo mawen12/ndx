@@ -146,7 +146,7 @@ func (q *Query) Init(ctx context.Context) {
 			return nil
 		case tcell.KeyEnter:
 			app.Config.Pattern = q.GetText()
-			app.Query(context.Background())
+			app.Query(context.Background(), false)
 			app.Render()
 			return nil
 		}
@@ -421,6 +421,7 @@ func snapDataBinsInChartDots(dataBinsInChartDot int) int {
 
 type Table struct {
 	*tview.Table
+	app *App
 }
 
 func NewTable() *Table {
@@ -434,16 +435,16 @@ func (t *Table) Name() internal.ComponentKey {
 }
 
 func (t *Table) Init(ctx context.Context) {
-	app := extractApp(ctx)
+	t.app = extractApp(ctx)
 
 	t.SetFocusFunc(func() {
-		app.QueueUpdateDraw(func() {
+		t.app.QueueUpdateDraw(func() {
 			t.SetSelectable(true, false)
 		})
 	})
 
 	t.SetBlurFunc(func() {
-		app.QueueUpdateDraw(func() {
+		t.app.QueueUpdateDraw(func() {
 			t.SetSelectable(false, false)
 		})
 	})
@@ -451,20 +452,33 @@ func (t *Table) Init(ctx context.Context) {
 	t.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyTab:
-			app.SetFocus(app.components.MustGet(internal.QueryComponent))
+			t.app.SetFocus(t.app.components.MustGet(internal.QueryComponent))
 		case tcell.KeyBacktab:
-			app.SetFocus(app.components.MustGet(internal.HistogramComponent))
+			t.app.SetFocus(t.app.components.MustGet(internal.HistogramComponent))
 		default:
 			switch event.Rune() {
 			case 'i':
-				app.SetFocus(app.components.MustGet(internal.QueryComponent))
+				t.app.SetFocus(t.app.components.MustGet(internal.QueryComponent))
 			case ':':
-				cmd := app.components.MustGet(internal.CmdComponent).(*Cmd)
+				cmd := t.app.components.MustGet(internal.CmdComponent).(*Cmd)
 				cmd.SetPrev(t)
-				app.SetFocus(cmd)
+				t.app.SetFocus(cmd)
 			}
 		}
 		return event
+	})
+
+	t.SetSelectedFunc(func(rows int, column int) {
+		if rows == 1 { // MOAR button
+			t.app.Query(context.Background(), true)
+			t.SetCell(1, 0, tview.NewTableCell("< Loading... >").
+				SetAlign(tview.AlignCenter).
+				SetSelectable(true).
+				SetAttributes(tcell.AttrBold).
+				SetSelectedStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue)).
+				SetStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite)))
+			return
+		}
 	})
 }
 
@@ -490,7 +504,10 @@ func (t *Table) ShowLogs(lines []model.LogLine) {
 		return tcs
 	}
 
-	var rowIndex int
+	rowIndex := 1
+	t.SetCell(rowIndex, 0, tview.NewTableCell("<MORE !>").SetAlign(tview.AlignCenter))
+	rowIndex++
+
 	for _, line := range lines {
 		for _, cell := range newTableCellFunc(line) {
 			t.SetCell(rowIndex, 0, cell)
@@ -499,6 +516,65 @@ func (t *Table) ShowLogs(lines []model.LogLine) {
 	}
 
 	t.Select(len(lines)-1, 0)
+	t.ScrollToEnd()
+}
+
+func (t *Table) ShowLogsV2(lines []model.LogLine) {
+	t.Clear()
+
+	newTableCellFunc := func(line model.LogLine) []*tview.TableCell {
+		ls := strings.Split(line.OriginalLine(), "\000")
+		cells := make([]*tview.TableCell, 0)
+
+		width := t.app.Width - 2
+
+		for _, l := range ls {
+			for {
+				if l == "" {
+					break
+				}
+
+				length := len(l)
+				if len(l) > width {
+					length = width
+				}
+
+				content := l[:length]
+				if length != len(l) {
+					content += "⏎"
+				}
+				tc := tview.NewTableCell(tview.Escape(content)).
+					SetSelectable(true).
+					SetAttributes(tcell.AttrBold).
+					SetSelectedStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue)).
+					SetStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite))
+
+				tc.SetReference(line)
+				cells = append(cells, tc)
+
+				l = l[length:]
+			}
+		}
+		return cells
+	}
+
+	rowIndex := 1
+	t.SetCell(rowIndex, 0, tview.NewTableCell("< MOAR ! >").
+		SetAlign(tview.AlignCenter).
+		SetSelectable(true).
+		SetAttributes(tcell.AttrBold).
+		SetSelectedStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue)).
+		SetStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite)))
+	rowIndex++
+
+	for _, line := range lines {
+		for _, cell := range newTableCellFunc(line) {
+			t.SetCell(rowIndex, 0, cell)
+			rowIndex++
+		}
+	}
+
+	t.Select(rowIndex-1, 0)
 	t.ScrollToEnd()
 }
 

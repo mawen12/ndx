@@ -3,6 +3,7 @@ package logclient
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/mawen12/ndx/internal/model"
@@ -84,7 +85,7 @@ func (rs *ResultStream) Read() model.QueryResult {
 
 	rs.stat = make(map[int64]int)
 
-	err := rs.NextLine()
+	err := rs.read()
 	if rs.err == nil && err != nil {
 		rs.err = err
 	}
@@ -98,7 +99,7 @@ func (rs *ResultStream) Read() model.QueryResult {
 	return br
 }
 
-func (rs *ResultStream) NextLine() error {
+func (rs *ResultStream) read() error {
 	for !rs.closed && rs.err == nil {
 		msg, err := rs.LogClient.receiveMessage()
 		if err != nil {
@@ -113,7 +114,9 @@ func (rs *ResultStream) NextLine() error {
 				message:      msg.Line,
 				originalLine: msg.Line,
 			}
-			//lineInfo.Parse(rs.ndConn.location)
+
+			slog.Debug("receive data line", "line", lineInfo)
+
 			rs.lines = append(rs.lines, lineInfo)
 		case *proto.Stat:
 			t, err := time.ParseInLocation("2006-01-02 15:04", msg.MinuteKey, rs.LogClient.location)

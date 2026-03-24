@@ -95,7 +95,7 @@ func (h *Histogram) SetBinSize(binSize int) *Histogram {
 }
 
 func (h *Histogram) SetData(data map[int64]int) *Histogram {
-	slog.Info("Histogram set data", "data", data)
+	slog.Info("Histogram setData", "data", data)
 	h.data = data
 	return h
 }

@@ -31,7 +31,6 @@ type LogClient struct {
 
 	peekedMsg model.BackendMessage
 
-	wbuf         []byte
 	resultStream model.ResultStream
 
 	cleanupDone chan struct{}
@@ -59,7 +58,6 @@ func connect(ctx context.Context, config *Config) (*LogClient, error) {
 	c.parameterStatuses = make(map[string]string)
 	c.location = time.UTC
 	c.config = config
-	c.wbuf = make([]byte, 0, 8196)
 	c.cleanupDone = make(chan struct{})
 
 	conn, err := config.DialFunc(ctx, *config)
@@ -106,6 +104,7 @@ func connect(ctx context.Context, config *Config) (*LogClient, error) {
 				}
 			}
 		case *proto.NoticeResponse:
+			slog.Debug("receive notice response", "content", msg)
 		default:
 			c.conn.Close()
 			return nil, &connectError{config: config, msg: "received unexpected message", err: err}
@@ -113,7 +112,7 @@ func connect(ctx context.Context, config *Config) (*LogClient, error) {
 	}
 }
 
-func (c *LogClient) Execute(ctx context.Context, pattern string, from, to time.Time) model.ResultStream {
+func (c *LogClient) Execute(ctx context.Context, queryContext model.QueryContext) model.ResultStream {
 	if err := c.lock(); err != nil {
 		return &ResultStream{closed: true, err: err}
 	}
@@ -127,14 +126,15 @@ func (c *LogClient) Execute(ctx context.Context, pattern string, from, to time.T
 		PathPrefix: c.config.PathPrefix,
 		ID:         "1",
 		LogFile:    c.config.LogFile,
-		Pattern:    pattern,
+		Pattern:    queryContext.Pattern,
+		LineUtil:   queryContext.LineUtil,
 	}
 
-	if !from.IsZero() {
-		queryMsg.From = from.In(c.location).Format("2006-01-02-15:04")
+	if !queryContext.From.IsZero() {
+		queryMsg.From = queryContext.From.In(c.location).Format("2006-01-02-15:04")
 	}
-	if !to.IsZero() {
-		queryMsg.To = to.In(c.location).Format("2006-01-02-15:04")
+	if !queryContext.To.IsZero() {
+		queryMsg.To = queryContext.To.In(c.location).Format("2006-01-02-15:04")
 	}
 
 	if err := c.frontend.Send(queryMsg); err != nil {
@@ -190,6 +190,7 @@ func (c *LogClient) receiveMessage() (model.BackendMessage, error) {
 
 	switch msg := msg.(type) {
 	case *proto.ParameterStatus:
+		slog.Debug("Receive parameter status", "name", msg.Name, "value", msg.Value)
 		c.parameterStatuses[msg.Name] = msg.Value
 	case *proto.NoticeResponse:
 		if c.config.OnNotice != nil {

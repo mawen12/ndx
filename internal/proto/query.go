@@ -3,6 +3,7 @@ package proto
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"strings"
 	"text/template"
 )
@@ -14,6 +15,7 @@ type Query struct {
 	From       string
 	To         string
 	Pattern    string
+	LineUtil   int
 }
 
 func (src *Query) Encode(dst []byte) ([]byte, error) {
@@ -30,6 +32,8 @@ func (src *Query) Encode(dst []byte) ([]byte, error) {
 		"To":          shellQuote(src.To),
 		"Pattern":     shellQuote(src.Pattern),
 		"ID":          src.ID,
+		"HasLineUtil": src.LineUtil != 0,
+		"LineUtil":    src.LineUtil,
 	})
 	if err != nil {
 		return nil, err
@@ -39,6 +43,8 @@ func (src *Query) Encode(dst []byte) ([]byte, error) {
 	if bs[len(bs)-1] != '\n' {
 		bs = append(bs, '\n')
 	}
+
+	slog.Debug("Encode Query protocol", "content", string(bs))
 
 	dst = append(dst, bs...)
 	return dst, nil

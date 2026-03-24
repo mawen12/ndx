@@ -1,12 +1,10 @@
 package model
 
-import (
-	"github.com/mawen12/ndx/pkg/times"
-)
+import "time"
 
 type QueryContext struct {
-	Pattern   string
-	TimeRange *times.TimeRange
-
-	QueryFunc func()
+	Pattern  string
+	From     time.Time
+	To       time.Time
+	LineUtil int
 }

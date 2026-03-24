@@ -67,7 +67,7 @@ func (p *Pool) run(ctx context.Context) {
 		case <-ticker.C:
 			s := p.Stat()
 			p.notifyListeners(s)
-			slog.Info("checking connections status", "stat", s)
+			//slog.Info("checking connections status", "stat", s)
 			if s.Closed != 0 {
 				//for connString, c := range s.ClosedConns {
 				//	slog.Info("reconnecting", "connString", connString)
@@ -160,7 +160,9 @@ type execResult struct {
 	Result     model.QueryResult
 }
 
-func (p *Pool) Query(ctx context.Context, qc config.Query) (MergedResult, error) {
+func (p *Pool) Query(ctx context.Context, qc model.QueryContext) (MergedResult, error) {
+	slog.Info("pool query", "pattern", qc.Pattern, "from", qc.From, "to", qc.To, "lineUtil", qc.LineUtil)
+
 	start := time.Now()
 	resultCh := make(chan execResult)
 	var wg sync.WaitGroup
@@ -169,7 +171,7 @@ func (p *Pool) Query(ctx context.Context, qc config.Query) (MergedResult, error)
 		go func() {
 			defer wg.Done()
 
-			ret := conn.Exec(ctx, qc.Pattern, qc.TimeRange.ActualFrom, qc.TimeRange.ActualQuery)
+			ret := conn.Exec(ctx, qc)
 			resultCh <- execResult{connString: connString, Result: ret}
 		}()
 	}

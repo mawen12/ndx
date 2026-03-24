@@ -1,6 +1,8 @@
 bash {{.AgentPath}} query \
   --index-file {{.IndexFile}} \
   --max-num-lines {{.MaxNumLines}} \
-  --logfile {{.LogFile}} {{if .FromExists}}--from {{.From}}{{end}} {{if .ToExists}}--to {{.To}}{{end}} {{if .RefreshIndex}}--refresh-index{{end}} {{ .Pattern}}
+  --logfile {{.LogFile}} \
+  --from {{.From}} \
+  --to {{.To}} {{if .HasLineUtil}}--lines-until {{.LineUtil}}{{end}} {{if .RefreshIndex}}--refresh-index{{end}} {{ .Pattern}}
 
 echo 'Z:{{ .ID }}'

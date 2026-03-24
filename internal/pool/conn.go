@@ -2,7 +2,6 @@ package pool
 
 import (
 	"context"
-	"time"
 
 	"github.com/mawen12/ndx/internal/config"
 	"github.com/mawen12/ndx/internal/logclient"
@@ -30,6 +29,6 @@ func (c *Conn) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (c *Conn) Exec(ctx context.Context, pattern string, from, to time.Time) model.QueryResult {
-	return c.LogClient.Execute(ctx, pattern, from, to).Read()
+func (c *Conn) Exec(ctx context.Context, queryContext model.QueryContext) model.QueryResult {
+	return c.LogClient.Execute(ctx, queryContext).Read()
 }

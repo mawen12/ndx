@@ -17,6 +17,7 @@ import (
 
 type App struct {
 	*tview.Application
+	Width, Height int
 
 	pages      *Pages
 	components *Components
@@ -93,7 +94,9 @@ func (app *App) Init() {
 					return nil
 				}
 
-				if err = app.Query(context.Background()); err != nil {
+				app.SetQuery(query)
+
+				if err = app.Query(context.Background(), false); err != nil {
 					app.pages.MustGet(internal.KeyMessageModal).(*MessageModal).SetErrorMessage(err.Error())
 					app.Show(internal.KeyMessageModal)
 					return nil
@@ -180,6 +183,8 @@ func (app *App) Run() error {
 	app.SetRoot(app.pages, true)
 	app.Show(internal.KeyMainPage)
 	app.Show(internal.KeyEditModal)
+
+	app.Application.SetBeforeDrawFunc(app.updateSize)
 
 	if err := app.Application.Run(); err != nil {
 		return err
@@ -271,17 +276,29 @@ func (app *App) Connect(ctx context.Context, query config.Query) error {
 	if app.Pool != nil {
 		app.Pool.Close()
 	}
+
 	app.Pool = pool.NewPool(query.Conns)
 
 	return app.Pool.Connect(ctx)
 }
 
-func (app *App) Query(ctx context.Context) error {
+func (app *App) Query(ctx context.Context, loadEarlier bool) error {
 	if app.Pool == nil {
 		panic("app query not implemented")
 	}
 
-	ret, err := app.Pool.Query(ctx, *app.Config)
+	queryContext := model.QueryContext{
+		Pattern: app.Config.Pattern,
+		From:    app.Config.TimeRange.ActualFrom,
+		To:      app.Config.TimeRange.ActualQuery,
+	}
+
+	// read first record
+	if loadEarlier && len(app.Result.Lines) > 0 {
+		queryContext.LineUtil = app.Result.Lines[0].LogNumber()
+	}
+
+	ret, err := app.Pool.Query(ctx, queryContext)
 	if err != nil {
 		return err
 	}
@@ -300,10 +317,18 @@ func (app *App) Render() {
 		histogram.SetRange(int(app.Config.TimeRange.ActualFrom.Unix()), int(app.Config.TimeRange.ActualTo.Unix()))
 		histogram.SetData(app.Result.Stat)
 
-		table.ShowLogs(app.Result.Lines)
+		//table.ShowLogs(app.Result.Lines)
+		table.ShowLogsV2(app.Result.Lines)
 
 		cmd.ShowQueryDuration(app.Result.Duration)
+
+		app.SetFocus(table)
 	})
+}
+
+func (app *App) updateSize(screen tcell.Screen) bool {
+	app.Width, app.Height = screen.Size()
+	return false
 }
 
 func extractApp(ctx context.Context) *App {

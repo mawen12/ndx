@@ -13,7 +13,7 @@ const (
 	AgentSearchShName = "agent_search.sh"
 	IndexFileName     = "index.log"
 
-	MaxNumLines = 300
+	MaxNumLines = 3
 )
 
 var (

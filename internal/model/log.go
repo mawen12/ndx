@@ -25,7 +25,6 @@ type QueryResult interface {
 
 type ResultStream interface {
 	Read() QueryResult
-	NextLine() error
 }
 
 type Notice struct {

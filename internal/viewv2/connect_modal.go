@@ -205,7 +205,7 @@ func (t *ConnectTask) Start() {
 			// query
 			t.messageChan <- ConnectMessage{Title: "Step 3: Querying..."}
 
-			err = t.app.Query(ctx)
+			err = t.app.Query(ctx, false)
 			if err != nil {
 				t.messageChan <- ConnectMessage{Pause: true, Err: err}
 			}

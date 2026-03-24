@@ -38,18 +38,21 @@ run_search() {
           lastNRs[curLine] = prevNR;
           curLine++;
           # print "curLine result " curLine
+          # 当 curLine 达到 maxLines 时，重置为 0，覆盖最旧的日志
           if (curLine >= maxLines) {
-            currentLog="";
-            exit;
+            curLine = 0;
           }
         }
+
+        currentLog=$0;
+        prevNR = NR;
 
         # 开始新的日志行
         curMinKey = substr($0, 1, 16);
         # print "N:current min key is " curMinKey 
         stats[curMinKey]++;
-        currentLog=$0;
-        prevNR = NR;
+
+        '$lines_util_check'
       } else {
         # 续行：追加到当前日志，用空格分离
         currentLog = sprintf("%s%c%s", currentLog, 0, $0);
@@ -69,9 +72,24 @@ run_search() {
         print "T:" x ":" stats[x]
       }
 
-      for (i = 0; i < curLine; i++) {
-        curNR = lastNRs[i];
-        line = lastLines[i];
+      for (x in lastLines) {
+        print "N:" x ":" lastNRs[x] ":" lastLines[x]
+      }
+
+      for (i = 0; i < maxLines; i++) {
+        # 从当前位置读取值，如果超过 maxLines 则回绕到开头。这样确保在限制maxLines时，只返回最新的日志行。
+        # 较旧的日志行可以通过 loadEarlier => lineUtil 来访问
+        ln = curLine + i;
+        if (ln >= maxLines) {
+          ln -= maxLines
+        }
+
+        if (!lastLines[ln]) {
+          continue;
+        }
+
+        curNR = lastNRs[ln];
+        line = lastLines[ln];
         print "D:" curNR ":" line
       }
     }

@@ -230,6 +230,11 @@ if [[ "$from_linenr" != "" ]]; then
   from_linenr_int=$from_linenr
 fi
 
+lines_util_check=''
+if [[ "$lines_until" != "" ]]; then
+  lines_util_check="if (NR >= $lines_until) { next; }"
+fi
+
 num_bytes_to_scan=0
 if [[ "$from_bytenr" == "" && "$to_bytenr" == "" ]]; then
   num_bytes_to_scan=$logfile_size
@@ -259,7 +264,7 @@ elif [[ "$to_bytenr" != "" ]]; then
     cmds+=("head -c $((to_bytenr-1)) $logfile")
   fi
 else
-  echo "N:Getting logs from the very begining in $logfile"
+  echo "N:Getting logs from the very beginning in $logfile"
   cmds+=("cat $logfile")
 fi
 
@@ -271,6 +276,7 @@ echo "N:pattern is $user_pattern"
 eval $cmds_concatenated | \
   user_pattern="$user_pattern" \
   max_num_lines="$max_num_lines" \
+  lines_util_check="$lines_util_check" \
   num_bytes_to_scan="$num_bytes_to_scan" \
   run_search -
 
