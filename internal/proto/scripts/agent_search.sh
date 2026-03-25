@@ -30,6 +30,8 @@ run_search() {
 
     '$awk_pattern'
 
+    '$lines_util_check'
+
     {
       if (validPrefix()) {  
         # 先保存上一条完整日志
@@ -51,8 +53,6 @@ run_search() {
         curMinKey = substr($0, 1, 16);
         # print "N:current min key is " curMinKey 
         stats[curMinKey]++;
-
-        '$lines_util_check'
       } else {
         # 续行：追加到当前日志，用空格分离
         currentLog = sprintf("%s%c%s", currentLog, 0, $0);

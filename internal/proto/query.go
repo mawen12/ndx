@@ -23,7 +23,7 @@ func (src *Query) Encode(dst []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	err := t.Execute(&buf, map[string]any{
 		"AgentPath":   fmt.Sprintf("%s/%s", src.PathPrefix, AgentShName),
-		"IndexFile":   IndexFileName,
+		"IndexFile":   fmt.Sprintf("%s/%s", src.PathPrefix, IndexFileName),
 		"MaxNumLines": MaxNumLines,
 		"LogFile":     src.LogFile,
 		"FromExists":  src.From != "",

@@ -218,6 +218,10 @@ else
   fi
 fi
 
+echo "N:from_result:$from_result"
+echo "N:from_linenr:$from_linenr"
+echo "N:from_bytenr:$from_bytenr"
+
 if [[ $is_outside_of_range == 1 ]]; then
   echo "N:stage:$STAGE_DONE:done"
   exit 0
@@ -232,7 +236,7 @@ fi
 
 lines_util_check=''
 if [[ "$lines_until" != "" ]]; then
-  lines_util_check="if (NR >= $lines_until) { next; }"
+  lines_util_check="NR >= $lines_until { next; }"
 fi
 
 num_bytes_to_scan=0

@@ -471,12 +471,15 @@ func (t *Table) Init(ctx context.Context) {
 	t.SetSelectedFunc(func(rows int, column int) {
 		if rows == 1 { // MOAR button
 			t.app.Query(context.Background(), true)
-			t.SetCell(1, 0, tview.NewTableCell("< Loading... >").
-				SetAlign(tview.AlignCenter).
-				SetSelectable(true).
-				SetAttributes(tcell.AttrBold).
-				SetSelectedStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue)).
-				SetStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite)))
+			t.app.QueueUpdateDraw(func() {
+				t.SetCell(1, 0, tview.NewTableCell("< Loading... >").
+					SetAlign(tview.AlignCenter).
+					SetSelectable(true).
+					SetAttributes(tcell.AttrBold).
+					SetSelectedStyle(tcell.Style{}.Background(tcell.ColorWhite).Foreground(tcell.ColorBlue)).
+					SetStyle(tcell.Style{}.Background(tcell.ColorBlue).Foreground(tcell.ColorWhite)))
+			})
+			t.app.Render()
 			return
 		}
 	})

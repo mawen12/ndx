@@ -303,8 +303,14 @@ func (app *App) Query(ctx context.Context, loadEarlier bool) error {
 		return err
 	}
 
+	if loadEarlier {
+		app.Result.Lines = append(ret.Lines, app.Result.Lines...)
+		app.Result.Duration = ret.Duration
+	} else {
+		app.Result = ret
+	}
+
 	app.ShouldRender = true
-	app.Result = ret
 	return nil
 }
 
